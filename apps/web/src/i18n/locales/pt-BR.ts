@@ -191,6 +191,7 @@ export const ptBR: Dict = {
   'settings.mcpKeysGenerate': 'Gerar chave MCP',
   'settings.mcpKeysRotate': 'Rotate token',
   'settings.mcpKeysShellEnv': '$OD_MCP_TOKEN saved to {file}',
+  'settings.mcpInstructionGemini': 'Mescle este JSON em {path}.',
   'settings.externalMcpTitle': 'MCP externo',
   'settings.externalMcpHint': 'Adicione ferramentas MCP de serviços externos (Higgsfield, GitHub, …).',
   'settings.mediaProviderApiKey': 'API key',

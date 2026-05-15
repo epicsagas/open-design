@@ -221,7 +221,7 @@ export const zhTW: Dict = {
   // MCP server settings
   'settings.mcpTitle': 'MCP server',
   'settings.mcpHint':
-    '讓其他專案中的程式碼代理（Claude Code、Cursor、VS Code、Antigravity、Zed、Windsurf）讀取您的 Open Design 專案。您可以直接將設計匯入應用程式，無需先匯出 zip。',
+    '讓其他專案中的程式碼代理（Claude Code、Cursor、VS Code、Antigravity、Gemini、Zed、Windsurf）讀取您的 Open Design 專案。您可以直接將設計匯入應用程式，無需先匯出 zip。',
   'settings.mcpDaemonError':
     '無法連線到本地守護程序以解析安裝路徑（{error}）。請確認 Open Design 正在執行，然後重新開啟此面板。',
   'settings.mcpBuildDaemon': '請先建置守護行程。',
@@ -233,6 +233,7 @@ export const zhTW: Dict = {
   'settings.mcpMethodToml': 'TOML 設定檔',
   'settings.mcpInstructionCodex':
     '將此表格附加到 {path}。Codex CLI 與 Codex IDE 擴充功能共用相同的設定。',
+  'settings.mcpInstructionGemini': '將此 JSON 合併至 {path}。',
   'settings.mcpMethodOneClick': '一鍵安裝',
   'settings.mcpInstructionCursor':
     '點擊「在 Cursor 中安裝」以透過核准對話框安裝，或將此 JSON 合併至 {path}。',

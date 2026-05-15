@@ -230,7 +230,7 @@ export const en: Dict = {
   // MCP server settings
   'settings.mcpTitle': 'MCP server',
   'settings.mcpHint':
-    'Lets a coding agent in another repo (Claude Code, Cursor, VS Code, Antigravity, Zed, Windsurf) read your Open Design projects. Use it to pull a design into your app without exporting a zip first.',
+    'Lets a coding agent in another repo (Claude Code, Cursor, VS Code, Antigravity, Gemini, Gemini, Zed, Windsurf) read your Open Design projects. Use it to pull a design into your app without exporting a zip first.',
   'settings.mcpDaemonError':
     "Couldn't reach the local daemon to resolve install paths ({error}). Make sure Open Design is running, then reopen this panel.",
   'settings.mcpBuildDaemon': 'Build the daemon first.',
@@ -242,6 +242,7 @@ export const en: Dict = {
   'settings.mcpMethodToml': 'TOML config',
   'settings.mcpInstructionCodex':
     'Append this table to {path}. The same config is shared between the Codex CLI and the Codex IDE extension.',
+  'settings.mcpInstructionGemini': 'Merge this JSON into {path}.',
   'settings.mcpMethodOneClick': 'One-click install',
   'settings.mcpInstructionCursor':
     'Click "Install in Cursor" to install with an approval dialog, or merge this JSON into {path}.',

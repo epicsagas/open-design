@@ -228,7 +228,7 @@ export const zhCN: Dict = {
   // MCP server settings
   'settings.mcpTitle': 'MCP server',
   'settings.mcpHint':
-    '让其他仓库中的编码助手（Claude Code、Cursor、VS Code、Antigravity、Zed、Windsurf）读取你的 Open Design 项目。无需先导出 zip，即可将设计拉取到你的应用中。',
+    '让其他仓库中的编码助手（Claude Code、Cursor、VS Code、Antigravity、Gemini、Zed、Windsurf）读取你的 Open Design 项目。无需先导出 zip，即可将设计拉取到你的应用中。',
   'settings.mcpDaemonError':
     '无法连接到本地守护进程以解析安装路径（{error}）。请确保 Open Design 正在运行，然后重新打开此面板。',
   'settings.mcpBuildDaemon': '请先构建守护进程。',
@@ -240,6 +240,7 @@ export const zhCN: Dict = {
   'settings.mcpMethodToml': 'TOML 配置',
   'settings.mcpInstructionCodex':
     '将以下配置追加到 {path}。Codex CLI 与 Codex IDE 扩展共享同一配置。',
+  'settings.mcpInstructionGemini': '将此 JSON 合并到 {path}。',
   'settings.mcpMethodOneClick': '一键安装',
   'settings.mcpInstructionCursor':
     '点击"在 Cursor 中安装"以通过确认对话框安装，或将此 JSON 合并到 {path}。',
