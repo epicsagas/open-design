@@ -22,7 +22,7 @@ import { initMcpKeyStore, allMcpKeyHashes, generateMcpKey, listMcpKeys, revealMc
 import { createIpAllowlistMiddleware } from './ip-allowlist.js';
 import { renderLoginPage } from './login-page.js';
 import { isNetworkExposed, parseAllowedHosts } from './network-config.js';
-import { checkRateLimit } from './login-rate-limit.js';
+import { checkRateLimit, startCleanupInterval as startRateLimitCleanup } from './login-rate-limit.js';
 import { createSession, extractSessionCookie, isValidSession, revokeSession, startCleanupInterval } from './session-store.js';
 import { createCommandInvocation } from '@open-design/platform';
 import { SIDECAR_DEFAULTS, SIDECAR_ENV } from '@open-design/sidecar-proto';
@@ -2164,8 +2164,14 @@ export async function startServer({
   // daemon is reachable from the LAN. Apply IP allowlist and
   // API key authentication to prevent unauthorized access.
   const networkExposed = isNetworkExposed(effectiveHost);
-  const authEnabled = networkExposed
-    && (await allValidHashes(RUNTIME_DATA_DIR)).length + (await allMcpKeyHashes(RUNTIME_DATA_DIR)).length > 0;
+  const authEnabledRef = {
+    value: networkExposed
+      && (await allValidHashes(RUNTIME_DATA_DIR)).length + (await allMcpKeyHashes(RUNTIME_DATA_DIR)).length > 0,
+  };
+  async function refreshAuthEnabled(): Promise<void> {
+    authEnabledRef.value = networkExposed
+      && (await allValidHashes(RUNTIME_DATA_DIR)).length + (await allMcpKeyHashes(RUNTIME_DATA_DIR)).length > 0;
+  }
   if (networkExposed) {
     const envAllowedHosts = parseAllowedHosts(process.env.OD_ALLOWED_HOSTS);
     const allowedHosts = envAllowedHosts.length > 0
@@ -2173,7 +2179,7 @@ export async function startServer({
       : (Array.isArray(savedPrefs.allowedHosts) ? savedPrefs.allowedHosts : []);
     app.use(createIpAllowlistMiddleware(allowedHosts));
     app.use(createAuthMiddleware({
-      enabled: authEnabled,
+      enabledRef: authEnabledRef,
       networkExposed,
       isLocalPeer: isLoopbackPeerAddress,
       resolveHashes: async () => [
@@ -2188,7 +2194,7 @@ export async function startServer({
     if (allowedHosts.length === 0) {
       console.warn('[od] WARNING: no IP allowlist configured; all network hosts can connect. Set OD_ALLOWED_HOSTS or configure in Settings → Network.');
     }
-    if (!authEnabled) {
+    if (!authEnabledRef.value) {
       console.warn('[od] WARNING: no API keys configured — only localhost access allowed; run `od auth key generate` to create one');
     }
     // Security headers for network-exposed daemon.
@@ -2202,7 +2208,7 @@ export async function startServer({
 
   // ── Login gateway for LAN browser access ───────────────────────
   app.get('/login', (req, res) => {
-    if (!authEnabled) return res.redirect(302, '/');
+    if (!authEnabledRef.value) return res.redirect(302, '/');
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.setHeader('Cache-Control', 'no-store');
     const next = typeof req.query.next === 'string' ? req.query.next : '';
@@ -2249,6 +2255,13 @@ export async function startServer({
   });
 
   app.post('/api/auth/logout', (req, res) => {
+    // CSRF protection: reject cross-origin POSTs.
+    const origin = req.headers.origin;
+    const expectedOrigin = `http://localhost:${resolvedPortRef.current}`;
+    if (origin && origin !== expectedOrigin) {
+      res.status(403).json({ error: 'FORBIDDEN', reason: 'cross-origin request rejected' });
+      return;
+    }
     const token = extractSessionCookie(req.headers.cookie);
     if (token) revokeSession(token);
     res.setHeader('Set-Cookie', [
@@ -2288,12 +2301,14 @@ export async function startServer({
       await revokeMcpKey(RUNTIME_DATA_DIR, k.id);
     }
     bustInstallInfoCache();
+    await refreshAuthEnabled();
     console.log(`[od] all API keys and MCP keys reset via localhost emergency reset`);
     res.redirect(302, '/');
   });
 
   if (networkExposed) {
     startCleanupInterval();
+    startRateLimitCleanup();
   }
 
   // Multi-directory scanning shared by every skill / template surface. The
@@ -2473,7 +2488,11 @@ export async function startServer({
   });
 
   // ── Network config & API key management ────────────────────
-  app.get('/api/network-config', async (_req, res) => {
+  app.get('/api/network-config', async (req, res) => {
+    if (!isLocalSameOrigin(req, resolvedPort)) {
+      res.status(403).json({ error: 'FORBIDDEN', reason: 'network config is only available from localhost' });
+      return;
+    }
     const prefs = await readAppConfig(RUNTIME_DATA_DIR).catch(() => ({}));
     const envHost = process.env.OD_BIND_HOST;
     const envPort = process.env.OD_PORT ? Number(process.env.OD_PORT) : undefined;
@@ -2486,6 +2505,10 @@ export async function startServer({
   });
 
   app.put('/api/network-config', async (req, res) => {
+    if (!isLocalSameOrigin(req, resolvedPort)) {
+      res.status(403).json({ error: 'FORBIDDEN', reason: 'network config changes are only available from localhost' });
+      return;
+    }
     const { bindHost, port, allowedHosts } = req.body ?? {};
     const validHosts = ['127.0.0.1', '0.0.0.0', '::1', 'localhost'];
     const host = typeof bindHost === 'string' ? bindHost : '127.0.0.1';
@@ -2515,7 +2538,7 @@ export async function startServer({
   });
 
   app.post('/api/restart', async (req, res) => {
-    if (!isLocalSameOrigin(req)) {
+    if (!isLocalSameOrigin(req, resolvedPort)) {
       res.status(403).json({ error: 'FORBIDDEN', reason: 'restart is only available from localhost' });
       return;
     }
@@ -2528,41 +2551,68 @@ export async function startServer({
     setTimeout(() => process.kill(process.pid, 'SIGTERM'), 150);
   });
 
-  app.get('/api/auth/keys', async (_req, res) => {
+  app.get('/api/auth/keys', async (req, res) => {
+    if (!isLocalSameOrigin(req, resolvedPort)) {
+      res.status(403).json({ error: 'FORBIDDEN', reason: 'API key management is only available from localhost' });
+      return;
+    }
     const keys = await listKeys(RUNTIME_DATA_DIR);
     res.json({ keys });
   });
 
   app.post('/api/auth/keys', async (req, res) => {
+    if (!isLocalSameOrigin(req, resolvedPort)) {
+      res.status(403).json({ error: 'FORBIDDEN', reason: 'API key management is only available from localhost' });
+      return;
+    }
     const { label } = req.body ?? {};
     const entry = await generateKey(RUNTIME_DATA_DIR, typeof label === 'string' ? label : '');
+    await refreshAuthEnabled();
     res.json(entry);
   });
 
   app.delete('/api/auth/keys/:id', async (req, res) => {
+    if (!isLocalSameOrigin(req, resolvedPort)) {
+      res.status(403).json({ error: 'FORBIDDEN', reason: 'API key management is only available from localhost' });
+      return;
+    }
     const removed = await revokeKey(RUNTIME_DATA_DIR, req.params.id);
     if (!removed) {
       res.status(404).json({ error: 'NOT_FOUND' });
       return;
     }
+    await refreshAuthEnabled();
     res.json({ ok: true });
   });
 
   // ── MCP key management (AES-256-GCM encrypted, UI-retrievable) ──
 
-  app.get('/api/mcp-keys', async (_req, res) => {
+  app.get('/api/mcp-keys', async (req, res) => {
+    if (!isLocalSameOrigin(req, resolvedPort)) {
+      res.status(403).json({ error: 'FORBIDDEN', reason: 'MCP key management is only available from localhost' });
+      return;
+    }
     const keys = await listMcpKeys(RUNTIME_DATA_DIR);
     res.json({ keys });
   });
 
   app.post('/api/mcp-keys', async (req, res) => {
+    if (!isLocalSameOrigin(req, resolvedPort)) {
+      res.status(403).json({ error: 'FORBIDDEN', reason: 'MCP key management is only available from localhost' });
+      return;
+    }
     const { label } = req.body ?? {};
     const entry = await generateMcpKey(RUNTIME_DATA_DIR, typeof label === 'string' ? label : '');
     bustInstallInfoCache();
+    await refreshAuthEnabled();
     res.json(entry);
   });
 
   app.get('/api/mcp-keys/:id', async (req, res) => {
+    if (!isLocalSameOrigin(req, resolvedPort)) {
+      res.status(403).json({ error: 'FORBIDDEN', reason: 'MCP key management is only available from localhost' });
+      return;
+    }
     const revealed = await revealMcpKey(RUNTIME_DATA_DIR, req.params.id);
     if (!revealed) {
       res.status(404).json({ error: 'NOT_FOUND' });
@@ -2572,12 +2622,17 @@ export async function startServer({
   });
 
   app.delete('/api/mcp-keys/:id', async (req, res) => {
+    if (!isLocalSameOrigin(req, resolvedPort)) {
+      res.status(403).json({ error: 'FORBIDDEN', reason: 'MCP key management is only available from localhost' });
+      return;
+    }
     const removed = await revokeMcpKey(RUNTIME_DATA_DIR, req.params.id);
     if (!removed) {
       res.status(404).json({ error: 'NOT_FOUND' });
       return;
     }
     bustInstallInfoCache();
+    await refreshAuthEnabled();
     res.json({ ok: true });
   });
 
@@ -3128,7 +3183,7 @@ export async function startServer({
   registerMcpRoutes(app, {
     http: httpDeps,
     paths: pathDeps,
-    mcp: { pendingAuth: mcpPendingAuth, daemonUrlRef, authEnabled },
+    mcp: { pendingAuth: mcpPendingAuth, daemonUrlRef, authEnabledRef, effectiveHost },
   });
 
   // Streamable HTTP MCP endpoint — remote agents connect here.

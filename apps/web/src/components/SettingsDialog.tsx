@@ -16,9 +16,7 @@ import {
   isStoredMediaProviderEntryEmpty,
   isStoredMediaProviderEntryPresent,
   KNOWN_PROVIDERS,
-  hasAnyConfiguredProvider,
   mergeDaemonMediaProviders,
-  syncComposioConfigToDaemon,
   syncConfigToDaemon,
   syncMediaProvidersToDaemon,
 } from '../state/config';
@@ -30,11 +28,6 @@ import {
   API_PROTOCOL_TABS,
   SUGGESTED_MODELS_BY_PROTOCOL,
 } from '../state/apiProtocols';
-import {
-  MAX_MAX_TOKENS,
-  MIN_MAX_TOKENS,
-  modelMaxTokensDefault,
-} from '../state/maxTokens';
 import type {
   AgentInfo,
   ApiProtocol,
@@ -43,7 +36,6 @@ import type {
   AppTheme,
   AppVersionInfo,
   ConnectionTestResponse,
-  OrbitRunSummary,
   OrbitStatusResponse,
   ExecMode,
   ProviderModelOption,
@@ -4251,46 +4243,25 @@ function McpKeysSection({ info, onKeyChanged }: { info: McpInstallInfo | null; o
   };
 
   return (
-    <div style={{ marginTop: 20 }}>
-      <p style={{ margin: '0 0 8px', fontSize: 13, fontWeight: 600 }}>
-        {t('settings.mcpKeysTitle')}
-      </p>
+    <div>
+      <p className="settings-label">{t('settings.mcpKeysTitle')}</p>
       {(info as any)?.networkExposed && keys.length === 0 && !(info?.env?.OD_API_KEY && info.env.OD_API_KEY !== '<your-api-key>') ? (
-        <div style={{
-          margin: '0 0 8px',
-          padding: '8px 10px',
-          fontSize: 12,
-          lineHeight: 1.5,
-          borderRadius: 6,
-          background: 'var(--surface-warn, #3d2e00)',
-          color: 'var(--text-warn, #f0ad4e)',
-          border: '1px solid var(--border-warn, #665200)',
-        }}>
+        <div className="settings-card warn" style={{ fontSize: 12, marginBottom: 8 }}>
           {t('settings.mcpKeysNetworkWarning')}
         </div>
       ) : null}
       {keys.length === 0 ? (
-        <p style={{ margin: '0 0 8px', fontSize: 12, color: 'var(--text-muted)' }}>
-          {t('settings.mcpKeysEmpty')}
-        </p>
+        <p className="hint" style={{ marginBottom: 8 }}>{t('settings.mcpKeysEmpty')}</p>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           {keys.map((k) => (
-            <div key={k.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
-              <code style={{
-                background: 'var(--surface-2, #11141a)',
-                padding: '2px 6px',
-                borderRadius: 4,
-                fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace',
-                fontSize: 11,
-              }}>
-                {revealedKeys.get(k.id) || `${k.keyPrefix}...`}
-              </code>
+            <div key={k.id} className="mcp-key-row">
+              <code>{revealedKeys.get(k.id) || `${k.keyPrefix}...`}</code>
               {k.label ? <span style={{ color: 'var(--text-muted)' }}>{k.label}</span> : null}
-              <button type="button" className="ghost" style={{ padding: '2px 8px', fontSize: 11 }} onClick={() => handleReveal(k.id)}>
+              <button type="button" className="ghost" onClick={() => handleReveal(k.id)}>
                 {t('settings.mcpKeysReveal')}
               </button>
-              <button type="button" className="ghost" style={{ padding: '2px 8px', fontSize: 11, color: 'var(--danger-fg, #f88)' }} onClick={() => handleRevoke(k.id)}>
+              <button type="button" className="ghost" onClick={() => handleRevoke(k.id)}>
                 {t('settings.mcpKeysRevoke')}
               </button>
             </div>
@@ -4302,7 +4273,6 @@ function McpKeysSection({ info, onKeyChanged }: { info: McpInstallInfo | null; o
         className="ghost"
         disabled={generating}
         onClick={handleGenerate}
-        style={{ marginTop: 8, fontSize: 12 }}
       >
         {generating ? '...' : t('settings.mcpKeysGenerate')}
       </button>
@@ -4440,6 +4410,8 @@ function IntegrationsSection() {
   const [copied, setCopied] = useState(false);
   const [info, setInfo] = useState<McpInstallInfo | null>(null);
   const [infoError, setInfoError] = useState<string | null>(null);
+  const [restarting, setRestarting] = useState(false);
+  const restartingRef = useRef(false);
   const pickerRef = useRef<HTMLDivElement | null>(null);
   // The reset is wired through a ref-driven timer rather than effect
   // cleanup so re-clicks during the 2s window restart the countdown.
@@ -4534,6 +4506,36 @@ function IntegrationsSection() {
     }
   };
 
+  const restartDaemon = async () => {
+    if (restartingRef.current) return;
+    restartingRef.current = true;
+    setRestarting(true);
+    const savedPort = Number(window.location.port) || 7456;
+    try {
+      await fetch('/api/restart', { method: 'POST' });
+    } catch { /* expected — daemon exits */ }
+    const checkHealth = async (retries: number): Promise<boolean> => {
+      for (let i = 0; i < retries; i++) {
+        await new Promise((resolve) => setTimeout(resolve, 1500));
+        try {
+          const resp = await fetch(`${window.location.protocol}//${window.location.hostname}:${savedPort}/api/health`);
+          if (resp.ok) return true;
+        } catch { /* not back yet */ }
+      }
+      return false;
+    };
+    const back = await checkHealth(30);
+    if (back) {
+      setRestarting(false);
+      restartingRef.current = false;
+      window.location.href = `${window.location.protocol}//${window.location.hostname}:${savedPort}`;
+    } else {
+      setRestarting(false);
+      restartingRef.current = false;
+      setInfoError(t('settings.restartFailed'));
+    }
+  };
+
   return (
     <section className="settings-section">
       <div className="section-head">
@@ -4545,17 +4547,20 @@ function IntegrationsSection() {
 
       <div className="settings-about-list" style={{ display: 'block' }}>
         <div
+          role="tablist"
           style={{
             display: 'flex',
             gap: 0,
             marginBottom: 14,
-            background: 'var(--surface-2, #11141a)',
+            background: 'var(--bg-muted)',
             borderRadius: 6,
             padding: 3,
           }}
         >
           <button
             type="button"
+            role="tab"
+            aria-selected={mcpMode === 'local'}
             onClick={() => setMcpMode('local')}
             style={{
               flex: 1,
@@ -4565,16 +4570,17 @@ function IntegrationsSection() {
               border: 'none',
               borderRadius: 4,
               cursor: 'pointer',
-              background: mcpMode === 'local' ? 'var(--surface-1, #1c2028)' : 'transparent',
-              color: mcpMode === 'local' ? 'var(--fg-1, #e6e6e6)' : 'var(--text-muted)',
+              background: mcpMode === 'local' ? 'var(--bg-panel)' : 'transparent',
+              color: mcpMode === 'local' ? 'var(--text)' : 'var(--text-muted)',
             }}
           >
             {t('settings.mcpTabLocal')}
           </button>
           <button
             type="button"
+            role="tab"
+            aria-selected={mcpMode === 'remote'}
             onClick={() => setMcpMode('remote')}
-            disabled={!info?.networkExposed}
             style={{
               flex: 1,
               padding: '6px 12px',
@@ -4582,10 +4588,9 @@ function IntegrationsSection() {
               fontWeight: 600,
               border: 'none',
               borderRadius: 4,
-              cursor: info?.networkExposed ? 'pointer' : 'not-allowed',
-              background: mcpMode === 'remote' ? 'var(--surface-1, #1c2028)' : 'transparent',
-              color: mcpMode === 'remote' ? 'var(--fg-1, #e6e6e6)' : 'var(--text-muted)',
-              opacity: info?.networkExposed ? 1 : 0.5,
+              cursor: 'pointer',
+              background: mcpMode === 'remote' ? 'var(--bg-panel)' : 'transparent',
+              color: mcpMode === 'remote' ? 'var(--text)' : 'var(--text-muted)',
             }}
           >
             {t('settings.mcpTabRemote')}
@@ -4593,33 +4598,18 @@ function IntegrationsSection() {
         </div>
 
         {isRemote && info && !info.networkExposed ? (
-          <div
-            className="empty-card"
-            style={{
-              marginBottom: 14,
-              borderLeft: '3px solid var(--warning-fg, #fbbf24)',
-            }}
-          >
+          <div className="empty-card warn" style={{ marginBottom: 14 }}>
             {t('settings.mcpRemoteDisabled')}
           </div>
         ) : null}
         {infoError ? (
-          <div
-            className="empty-card"
-            style={{ marginBottom: 14, color: 'var(--danger-fg, #f88)' }}
-          >
+          <div className="empty-card danger" style={{ marginBottom: 14 }}>
             {t('settings.mcpDaemonError', { error: infoError! })}
           </div>
         ) : null}
 
         {info && (!info.cliExists || !info.nodeExists) ? (
-          <div
-            className="empty-card"
-            style={{
-              marginBottom: 14,
-              borderLeft: '3px solid var(--warning-fg, #fbbf24)',
-            }}
-          >
+          <div className="empty-card warn" style={{ marginBottom: 14 }}>
             <strong>
               {!info.cliExists
                 ? t('settings.mcpBuildDaemon')
@@ -4673,12 +4663,7 @@ function IntegrationsSection() {
                     >
                       <span className="ds-picker-item-text">
                         <span className="ds-picker-item-title">{c.label}</span>
-                        <span
-                          style={{
-                            fontSize: 11,
-                            color: 'var(--text-muted)',
-                          }}
-                        >
+                        <span className="ds-picker-sub">
                           {info ? c.buildMethod(info) : ''}
                         </span>
                       </span>
@@ -4802,32 +4787,16 @@ function IntegrationsSection() {
 
         <McpKeysSection info={info} onKeyChanged={() => setInfo(null)} />
 
-        <div style={{ marginTop: 20, lineHeight: 1.55 }}>
-          <p
-            style={{
-              margin: '0 0 8px',
-              fontSize: 11,
-              color: 'var(--text-muted)',
-              textTransform: 'uppercase',
-              letterSpacing: '0.05em',
-              fontWeight: 600,
-            }}
-          >
-            {t('settings.mcpCapabilitiesTitle')}
-          </p>
-          <ul
-            style={{
-              margin: 0,
-              paddingLeft: 18,
-              fontSize: 13,
-              color: 'var(--text)',
-            }}
-          >
-            <li>{t('settings.mcpCapabilityRead')}</li>
-            <li>{t('settings.mcpCapabilityPull')}</li>
-            <li>{t('settings.mcpCapabilityDefault')}</li>
-          </ul>
-        </div>
+        {restarting ? (
+          <div className="settings-actions" style={{ marginTop: 16 }}>
+            <p className="hint" style={{ margin: 0 }}>{t('settings.restartingDaemon')}</p>
+          </div>
+        ) : (
+          <div className="settings-actions" style={{ marginTop: 16 }}>
+            <p className="hint" style={{ margin: 0 }}>{t('settings.networkRestartHint')}</p>
+            <button type="button" className="primary" onClick={restartDaemon}>{t('settings.restartDaemon')}</button>
+          </div>
+        )}
 
         <p
           style={{
@@ -5012,7 +4981,6 @@ function NetworkSection({ daemonLive }: { daemonLive: boolean }) {
   const [newKeyId, setNewKeyId] = useState<string | null>(null);
   const [label, setLabel] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const [pendingRestart, setPendingRestart] = useState(false);
   const [restarting, setRestarting] = useState(false);
   const restartingRef = useRef(false);
   const initialBindHost = useRef<string | null>(null);
@@ -5068,9 +5036,7 @@ function NetworkSection({ daemonLive }: { daemonLive: boolean }) {
       else {
         const savedBindHost = (patch.bindHost as string) ?? bindHost;
         const savedPort = typeof patch.port === 'number' ? patch.port : port;
-        if (savedBindHost !== initialBindHost.current || savedPort !== initialPort.current) {
-          setPendingRestart(true);
-        }
+        void savedBindHost; void savedPort;
       }
     } catch {
       setError(t('settings.networkSaveError'));
@@ -5098,7 +5064,6 @@ function NetworkSection({ daemonLive }: { daemonLive: boolean }) {
     };
     const back = await checkHealth(30);
     if (back) {
-      setPendingRestart(false);
       setRestarting(false);
       restartingRef.current = false;
       window.location.href = `${window.location.protocol}//${window.location.hostname}:${savedPort}`;
@@ -5218,19 +5183,15 @@ function NetworkSection({ daemonLive }: { daemonLive: boolean }) {
         </>
       )}
 
-      {pendingRestart && !restarting && (
-        <div style={{ marginTop: '16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <p className="hint" style={{ margin: 0 }}>{t('settings.networkRestartHint')}</p>
-          <button type="button" className="seg-btn active" onClick={restartDaemon}>{t('settings.restartDaemon')}</button>
-        </div>
-      )}
-      {restarting && (
-        <div style={{ marginTop: '16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+      {restarting ? (
+        <div className="settings-actions" style={{ marginTop: 16 }}>
           <p className="hint" style={{ margin: 0 }}>{t('settings.restartingDaemon')}</p>
         </div>
-      )}
-      {!pendingRestart && !restarting && (
-        <p className="hint" style={{ marginTop: '16px' }}>{t('settings.networkRestartHint')}</p>
+      ) : (
+        <div className="settings-actions" style={{ marginTop: 16 }}>
+          <p className="hint" style={{ margin: 0 }}>{t('settings.networkRestartHint')}</p>
+          <button type="button" className="primary" onClick={restartDaemon}>{t('settings.restartDaemon')}</button>
+        </div>
       )}
     </section>
   );

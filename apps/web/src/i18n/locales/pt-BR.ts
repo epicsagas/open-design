@@ -177,6 +177,10 @@ export const ptBR: Dict = {
   'settings.mediaProvidersHint': 'Chaves de API para geração de imagem, vídeo e áudio. Salvas localmente e sincronizadas com o daemon local.',
   'settings.mcpServerTitle': 'Servidor MCP',
   'settings.mcpServerHint': 'Exponha o Open Design como servidor MCP para o seu agente de código.',
+  'settings.mcpTabLocal': 'Local',
+  'settings.mcpTabRemote': 'Remote',
+  'settings.mcpRemoteDisabled':
+    'Remote access requires the daemon to be bound to a non-loopback address. Start with --host 0.0.0.0 or set OD_BIND_HOST to expose the daemon on the network.',
   'settings.mcpKeysTitle': 'Chaves MCP',
   'settings.mcpKeysEmpty': 'Nenhuma chave MCP. Gere uma para incluir automaticamente nos snippets de configuração.',
   'settings.mcpKeysReveal': 'Revelar',
