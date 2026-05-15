@@ -188,6 +188,8 @@ export const ptBR: Dict = {
   'settings.mcpKeysRevokeConfirm': 'Revogar esta chave MCP?',
   'settings.mcpKeysNetworkWarning': 'O daemon está exposto na rede. Gere uma chave MCP para ativar a autenticação.',
   'settings.mcpKeysGenerate': 'Gerar chave MCP',
+  'settings.mcpKeysRotate': 'Rotate token',
+  'settings.mcpKeysShellEnv': '$OD_MCP_TOKEN saved to {file}',
   'settings.externalMcpTitle': 'MCP externo',
   'settings.externalMcpHint': 'Adicione ferramentas MCP de serviços externos (Higgsfield, GitHub, …).',
   'settings.mediaProviderApiKey': 'API key',

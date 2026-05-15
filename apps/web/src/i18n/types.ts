@@ -509,6 +509,8 @@ export interface Dict {
   'settings.mcpKeysRevoke': string;
   'settings.mcpKeysRevokeConfirm': string;
   'settings.mcpKeysGenerate': string;
+  'settings.mcpKeysRotate': string;
+  'settings.mcpKeysShellEnv': string;
   'settings.mcpKeysNetworkWarning': string;
 
   // Notifications (settings + system notifications)

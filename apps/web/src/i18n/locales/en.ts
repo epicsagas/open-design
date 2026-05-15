@@ -283,7 +283,9 @@ export const en: Dict = {
   'settings.mcpKeysRevoke': 'Revoke',
   'settings.mcpKeysRevokeConfirm': 'Revoke this MCP key?',
   'settings.mcpKeysNetworkWarning': 'Daemon is exposed to the network. Generate an MCP key to enable authentication.',
-  'settings.mcpKeysGenerate': 'Generate MCP key',
+  'settings.mcpKeysGenerate': 'Generate token',
+  'settings.mcpKeysRotate': 'Rotate token',
+  'settings.mcpKeysShellEnv': '$OD_MCP_TOKEN saved to {file}',
 
   'entry.tabDesigns': 'Designs',
   'entry.tabTemplates': 'Templates',

@@ -282,6 +282,8 @@ export const zhCN: Dict = {
   'settings.mcpKeysRevokeConfirm': '确定要撤销此 MCP 密钥吗？',
   'settings.mcpKeysNetworkWarning': '守护进程已暴露到网络。请生成 MCP 密钥以启用认证。',
   'settings.mcpKeysGenerate': '生成 MCP 密钥',
+  'settings.mcpKeysRotate': 'Rotate token',
+  'settings.mcpKeysShellEnv': '$OD_MCP_TOKEN saved to {file}',
 
   'entry.tabDesigns': '我的设计',
   'entry.tabTemplates': '模板',

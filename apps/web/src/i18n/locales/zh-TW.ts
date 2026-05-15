@@ -275,6 +275,8 @@ export const zhTW: Dict = {
   'settings.mcpKeysRevokeConfirm': '確定要撤銷此 MCP 金鑰嗎？',
   'settings.mcpKeysNetworkWarning': '守護程式已暴露到網路。請產生 MCP 金鑰以啟用驗證。',
   'settings.mcpKeysGenerate': '產生 MCP 金鑰',
+  'settings.mcpKeysRotate': 'Rotate token',
+  'settings.mcpKeysShellEnv': '$OD_MCP_TOKEN saved to {file}',
 
   'entry.tabDesigns': '我的設計',
   'entry.tabTemplates': '範本',
