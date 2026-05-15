@@ -79,7 +79,7 @@ export function registerMcpRoutes(app: Express, ctx: RegisterMcpRoutesDeps) {
       authRequired,
       networkExposed: isNetworkExposed(effectiveHost ?? '127.0.0.1'),
       bindHost: effectiveHost ?? '127.0.0.1',
-      publicBaseUrl: process.env.OD_PUBLIC_BASE_URL,
+      ...(process.env.OD_PUBLIC_BASE_URL ? { publicBaseUrl: process.env.OD_PUBLIC_BASE_URL } : {}),
     });
     installInfoCache = { t: now, payload };
     res.json({ ...payload, ...(apiKey ? { apiKey, mcpKey: apiKey, remoteMcpKey: apiKey } : {}) });
