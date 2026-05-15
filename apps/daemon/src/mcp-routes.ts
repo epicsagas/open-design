@@ -41,7 +41,7 @@ export function registerMcpRoutes(app: Express, ctx: RegisterMcpRoutesDeps) {
     }
 
     if (installInfoCache && now - installInfoCache.t < INSTALL_INFO_TTL_MS) {
-      return res.json({ ...installInfoCache.payload, ...(apiKey ? { apiKey, mcpKey: apiKey } : {}) });
+      return res.json({ ...installInfoCache.payload, ...(apiKey ? { apiKey, mcpKey: apiKey, remoteMcpKey: apiKey } : {}) });
     }
     const cliPath = OD_BIN;
     const sidecarIpcPath = process.env[SIDECAR_ENV.IPC_PATH];
@@ -79,9 +79,10 @@ export function registerMcpRoutes(app: Express, ctx: RegisterMcpRoutesDeps) {
       authRequired,
       networkExposed: isNetworkExposed(effectiveHost ?? '127.0.0.1'),
       bindHost: effectiveHost ?? '127.0.0.1',
+      publicBaseUrl: process.env.OD_PUBLIC_BASE_URL,
     });
     installInfoCache = { t: now, payload };
-    res.json({ ...payload, ...(apiKey ? { apiKey, mcpKey: apiKey } : {}) });
+    res.json({ ...payload, ...(apiKey ? { apiKey, mcpKey: apiKey, remoteMcpKey: apiKey } : {}) });
   });
 
   // External MCP server configuration. Open Design connects to these as a
