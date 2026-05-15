@@ -19,22 +19,36 @@ describe('resolveDataDir', () => {
   let fakeHome: string;
   let projectRoot: string;
   let homedirSpy: ReturnType<typeof vi.spyOn>;
+  let savedToolsDevPid: string | undefined;
 
   beforeEach(() => {
     fakeHome = mkdtempSync(path.join(os.tmpdir(), 'rdd-home-'));
     projectRoot = mkdtempSync(path.join(os.tmpdir(), 'rdd-project-'));
     homedirSpy = vi.spyOn(os, 'homedir').mockReturnValue(fakeHome);
+    savedToolsDevPid = process.env.OD_TOOLS_DEV_PARENT_PID;
   });
 
   afterEach(async () => {
     homedirSpy.mockRestore();
+    if (savedToolsDevPid !== undefined) {
+      process.env.OD_TOOLS_DEV_PARENT_PID = savedToolsDevPid;
+    } else {
+      delete process.env.OD_TOOLS_DEV_PARENT_PID;
+    }
     await rm(fakeHome, { recursive: true, force: true });
     await rm(projectRoot, { recursive: true, force: true });
   });
 
-  it('returns <projectRoot>/.od when OD_DATA_DIR is unset', () => {
+  it('returns <projectRoot>/.od when running under tools-dev (OD_TOOLS_DEV_PARENT_PID set)', () => {
+    process.env.OD_TOOLS_DEV_PARENT_PID = String(process.pid);
     expect(resolveDataDir(undefined, projectRoot)).toBe(path.join(projectRoot, '.od'));
     expect(resolveDataDir('', projectRoot)).toBe(path.join(projectRoot, '.od'));
+  });
+
+  it('returns $HOME/.od when not under tools-dev (installed daemon / PM2)', () => {
+    delete process.env.OD_TOOLS_DEV_PARENT_PID;
+    expect(resolveDataDir(undefined, projectRoot)).toBe(path.join(fakeHome, '.od'));
+    expect(resolveDataDir('', projectRoot)).toBe(path.join(fakeHome, '.od'));
   });
 
   it('expands a leading ~/ against the user home directory', () => {

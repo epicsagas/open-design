@@ -160,6 +160,7 @@ export const en: Dict = {
   'settings.generateKey': 'Generate',
   'settings.networkRestartHint': 'Changes to bind address, port, or allowed hosts require a daemon restart.',
   'settings.networkSaveError': 'Failed to save. Check your input and try again.',
+  'settings.networkLoadError': 'Failed to load network settings.',
   'settings.themeSystem': 'System',
   'settings.themeLight': 'Light',
   'settings.themeDark': 'Dark',
@@ -269,6 +270,13 @@ export const en: Dict = {
     'Default to the project and file you have open in Open Design, so you can say "build this in my app" without re-stating which design.',
   'settings.mcpRunningNote':
     'Open Design must be running for MCP tool calls to succeed. If you started your coding agent before opening Open Design, restart the agent so it can reach the live daemon.',
+  'settings.mcpKeysTitle': 'MCP Keys',
+  'settings.mcpKeysEmpty': 'No MCP keys. Generate one to auto-include in config snippets.',
+  'settings.mcpKeysReveal': 'Reveal',
+  'settings.mcpKeysRevoke': 'Revoke',
+  'settings.mcpKeysRevokeConfirm': 'Revoke this MCP key?',
+  'settings.mcpKeysNetworkWarning': 'Daemon is exposed to the network. Generate an MCP key to enable authentication.',
+  'settings.mcpKeysGenerate': 'Generate MCP key',
 
   'entry.tabDesigns': 'Designs',
   'entry.tabTemplates': 'Templates',

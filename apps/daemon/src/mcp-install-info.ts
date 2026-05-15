@@ -28,6 +28,17 @@ export interface BuildMcpInstallPayloadInputs {
    *  caller wants propagated into the snippet. The caller decides
    *  what's worth propagating; this builder just merges. */
   sidecarEnv: Record<string, string>;
+  /** First valid daemon API key, when auth is enabled. Included in the
+   *  snippet env as OD_API_KEY so the spawned `od mcp` can authenticate
+   *  to a network-exposed daemon. Omitted when auth is not active. */
+  apiKey?: string;
+  /** When true, the daemon requires an API key but the raw key is not
+   *  available (stored as hash). The snippet env will include a placeholder
+   *  OD_API_KEY that the user must fill in. */
+  authRequired?: boolean;
+  /** True when the daemon is bound to a non-loopback address (0.0.0.0,
+   *  LAN IP, Tailscale IP). The UI uses this to prompt key setup. */
+  networkExposed?: boolean;
 }
 
 export interface McpInstallPayload {
@@ -39,6 +50,7 @@ export interface McpInstallPayload {
   cliExists: boolean;
   nodeExists: boolean;
   buildHint: string | null;
+  networkExposed?: boolean;
 }
 
 export function buildMcpInstallPayload(
@@ -65,6 +77,11 @@ export function buildMcpInstallPayload(
     OD_DATA_DIR: inputs.dataDir,
     ...inputs.sidecarEnv,
   };
+  if (inputs.apiKey) {
+    env.OD_API_KEY = inputs.apiKey;
+  } else if (inputs.authRequired) {
+    env.OD_API_KEY = '<your-api-key>';
+  }
   if (inputs.electronAsNode) {
     env.ELECTRON_RUN_AS_NODE = '1';
   }
@@ -85,12 +102,10 @@ export function buildMcpInstallPayload(
     args,
     env,
     daemonUrl: `http://127.0.0.1:${inputs.port}`,
-    // Surface platform so the install panel can localize path hints
-    // (~/.cursor vs %USERPROFILE%\.cursor) and keyboard shortcuts
-    // (Cmd vs Ctrl).
     platform: inputs.platform,
     cliExists: inputs.cliExists,
     nodeExists: inputs.nodeExists,
     buildHint: hints.length ? hints.join(' ') : null,
+    ...(inputs.networkExposed ? { networkExposed: true } : {}),
   };
 }

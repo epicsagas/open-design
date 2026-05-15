@@ -43,6 +43,9 @@ export interface AppConfigPrefs {
   telemetry?: TelemetryPrefs;
   privacyDecisionAt?: number | null;
   orbit?: OrbitConfigPrefs;
+  bindHost?: string;
+  port?: number;
+  allowedHosts?: string[];
 }
 
 const ALLOWED_KEYS: ReadonlySet<keyof AppConfigPrefs> = new Set([
@@ -58,6 +61,9 @@ const ALLOWED_KEYS: ReadonlySet<keyof AppConfigPrefs> = new Set([
   'telemetry',
   'privacyDecisionAt',
   'orbit',
+  'bindHost',
+  'port',
+  'allowedHosts',
 ] as const);
 
 function configFile(dataDir: string): string {
@@ -251,6 +257,21 @@ function applyConfigValue(
     const validated = validateOrbit(value);
     if (validated !== undefined) {
       target[key] = validated;
+    } else {
+      delete target[key];
+    }
+  }
+  if (key === 'bindHost') {
+    if (typeof value === 'string') target[key] = value;
+    return;
+  }
+  if (key === 'port') {
+    if (typeof value === 'number' && Number.isInteger(value) && value >= 1 && value <= 65535) target[key] = value;
+    return;
+  }
+  if (key === 'allowedHosts') {
+    if (Array.isArray(value) && value.every((v) => typeof v === 'string')) {
+      target[key] = value;
     } else {
       delete target[key];
     }

@@ -159,6 +159,7 @@ export const zhCN: Dict = {
   'settings.generateKey': 'Generate',
   'settings.networkRestartHint': 'Changes to bind address, port, or allowed hosts require a daemon restart.',
   'settings.networkSaveError': 'Failed to save. Check your input and try again.',
+  'settings.networkLoadError': 'Failed to load network settings.',
   'settings.themeSystem': '系统',
   'settings.themeLight': '浅色',
   'settings.themeDark': '深色',
@@ -267,6 +268,13 @@ export const zhCN: Dict = {
     '默认使用你在 Open Design 中打开的项目和文件，因此你可以直接说"在我的应用中构建这个"，无需重复说明是哪个设计。',
   'settings.mcpRunningNote':
     'Open Design 必须处于运行状态，MCP 工具调用才能成功。如果你在打开 Open Design 之前启动了编码助手，请重启助手以便它能连接到正在运行的守护进程。',
+  'settings.mcpKeysTitle': 'MCP 密钥',
+  'settings.mcpKeysEmpty': '没有 MCP 密钥。生成一个以自动包含在配置片段中。',
+  'settings.mcpKeysReveal': '显示',
+  'settings.mcpKeysRevoke': '撤销',
+  'settings.mcpKeysRevokeConfirm': '确定要撤销此MCP密钥吗？',
+  'settings.mcpKeysNetworkWarning': '已暴露到网络。请生成 MCP 密钥以启用身份验证。',
+  'settings.mcpKeysGenerate': '生成 MCP 密钥',
 
   'entry.tabDesigns': '我的设计',
   'entry.tabTemplates': '模板',

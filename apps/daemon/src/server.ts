@@ -17,9 +17,13 @@ import {
 } from './prompts/system.js';
 import { expandHomePrefix, resolveProjectRelativePath } from './home-expansion.js';
 import { createAuthMiddleware } from './auth-middleware.js';
-import { allValidKeys, generateKey, listKeys, revokeKey } from './auth-store.js';
+import { allValidHashes, verifyKey, generateKey, listKeys, revokeKey } from './auth-store.js';
+import { initMcpKeyStore, allMcpKeyHashes, generateMcpKey, listMcpKeys, revealMcpKey, revokeMcpKey } from './mcp-key-store.js';
 import { createIpAllowlistMiddleware } from './ip-allowlist.js';
-import { isNetworkExposed, parseAllowedHosts, readNetworkConfig, writeNetworkConfig, mergeWithEnv } from './network-config.js';
+import { renderLoginPage } from './login-page.js';
+import { isNetworkExposed, parseAllowedHosts } from './network-config.js';
+import { checkRateLimit } from './login-rate-limit.js';
+import { createSession, extractSessionCookie, isValidSession, revokeSession, startCleanupInterval } from './session-store.js';
 import { createCommandInvocation } from '@open-design/platform';
 import { SIDECAR_DEFAULTS, SIDECAR_ENV } from '@open-design/sidecar-proto';
 import {
@@ -142,7 +146,7 @@ import {
   readAllTokens,
   setToken,
 } from './mcp-tokens.js';
-import { agentCliEnvForAgent, readAppConfig, writeAppConfig } from './app-config.js';
+import { agentCliEnvForAgent, readAppConfig, writeAppConfig, type AppConfigPrefs } from './app-config.js';
 import { OrbitService, formatLocalProjectTimestamp, renderOrbitTemplateSystemPrompt } from './orbit.js';
 import {
   RoutineService,
@@ -230,7 +234,7 @@ import { LiveArtifactRefreshUnavailableError, refreshLiveArtifact } from './live
 import { LiveArtifactRefreshAbortError } from './live-artifacts/refresh.js';
 import { registerConnectorRoutes } from './connectors/routes.js';
 import { registerActiveContextRoutes } from './active-context-routes.js';
-import { registerMcpRoutes } from './mcp-routes.js';
+import { registerMcpRoutes, bustInstallInfoCache } from './mcp-routes.js';
 import { registerLiveArtifactRoutes } from './live-artifact-routes.js';
 import { registerDeployRoutes, registerDeploymentCheckRoutes } from './deploy-routes.js';
 import { registerMediaRoutes } from './media-routes.js';
@@ -923,7 +927,19 @@ const PROMPT_TEMPLATES_DIR = resolveDaemonResourceDir(
   path.join(PROJECT_ROOT, 'prompt-templates'),
 );
 export function resolveDataDir(raw, projectRoot) {
-  if (!raw) return path.join(projectRoot, '.od');
+  if (!raw) {
+    // Source checkout (running under tools-dev): use <repo>/.od
+    // Installed daemon (pnpm link --global, PM2, etc.): use $HOME/.od
+    // pnpm link --global creates a symlink to the source, so
+    // pnpm-workspace.yaml alone can't distinguish the two cases.
+    // OD_TOOLS_DEV_PARENT_PID is set exclusively by tools-dev.
+    const isDevMode = !!process.env.OD_TOOLS_DEV_PARENT_PID;
+    const dataDir = isDevMode
+      ? path.join(projectRoot, '.od')
+      : migrateOrCreateHomeDir(projectRoot);
+    ensureWritable(dataDir);
+    return dataDir;
+  }
   // expandHomePrefix is shared with media-config.ts so OD_DATA_DIR and
   // OD_MEDIA_CONFIG_DIR can never split state under a $HOME-style value.
   // Some launchers (systemd unit files, NixOS modules, certain Docker
@@ -933,11 +949,16 @@ export function resolveDataDir(raw, projectRoot) {
   // separators) into os.homedir() before path.resolve runs so launch
   // surfaces stay consistent.
   const resolved = resolveProjectRelativePath(raw, projectRoot);
+  ensureWritable(resolved);
+  return resolved;
+}
+
+function ensureWritable(dir: string) {
   try {
-    fs.mkdirSync(resolved, { recursive: true });
-    fs.accessSync(resolved, fs.constants.W_OK);
+    fs.mkdirSync(dir, { recursive: true });
+    fs.accessSync(dir, fs.constants.W_OK);
   } catch (err) {
-    const e = err;
+    const e = err as { message: string };
     const currentUser = (() => {
       try {
         return os.userInfo().username;
@@ -945,19 +966,69 @@ export function resolveDataDir(raw, projectRoot) {
         return process.env.USER ?? process.env.LOGNAME ?? 'unknown';
       }
     })();
-    const parentDir = path.dirname(resolved);
+    const parentDir = path.dirname(dir);
     throw new Error(
       [
-        `OD_DATA_DIR "${resolved}" is not writable: ${e.message}`,
+        `OD_DATA_DIR "${dir}" is not writable: ${e.message}`,
         `Current user: ${currentUser}`,
         `Check whether the folder or one of its parents is owned by another user, is a symlink to a protected location, or was previously created with sudo.`,
-        `Try: ls -ld "${parentDir}" "${resolved}"`,
+        `Try: ls -ld "${parentDir}" "${dir}"`,
         `If the folder should belong to you, fix ownership/permissions, for example: sudo chown -R "${currentUser}":staff "${parentDir}" && chmod -R u+rwX "${parentDir}"`,
       ].join(' '),
     );
   }
-  return resolved;
 }
+
+const DATA_DIR_PAYLOADS = [
+  'app.sqlite', 'app-config.json', 'daemon-api-keys.json', 'media-config.json',
+  'projects', 'artifacts', 'critique-artifacts', 'skills', 'design-systems',
+  'design-templates', 'connectors', 'composio',
+];
+
+function migrateOrCreateHomeDir(projectRoot: string): string {
+  const homeDir = path.join(os.homedir(), '.od');
+  const legacyDir = path.join(projectRoot, '.od');
+  const marker = path.join(homeDir, '.migrated-from');
+
+  if (fs.existsSync(homeDir)) return homeDir;
+  if (!fs.existsSync(legacyDir)) return homeDir;
+  if (fs.existsSync(marker)) return homeDir;
+
+  // Migrate each payload entry from legacy to home dir
+  try {
+    fs.mkdirSync(homeDir, { recursive: true });
+    for (const entry of DATA_DIR_PAYLOADS) {
+      const src = path.join(legacyDir, entry);
+      if (!fs.existsSync(src)) continue;
+      const lstat = fs.lstatSync(src);
+      if (lstat.isSymbolicLink()) continue;
+      const dst = path.join(homeDir, entry);
+      if (fs.existsSync(dst)) continue;
+      const tmp = dst + '.migrating';
+      copyPathSync(src, tmp);
+      fs.renameSync(tmp, dst);
+    }
+    fs.writeFileSync(marker, JSON.stringify({ from: legacyDir, at: Date.now() }), 'utf8');
+    console.log(`[od] migrated data from ${legacyDir} to ${homeDir}`);
+  } catch (err) {
+    console.warn(`[od] migration from ${legacyDir} to ${homeDir} failed: ${(err as Error).message}`);
+    console.warn(`[od] set OD_DATA_DIR=${legacyDir} to use the previous location`);
+  }
+  return homeDir;
+}
+
+function copyPathSync(src: string, dst: string) {
+  const stat = fs.statSync(src);
+  if (stat.isDirectory()) {
+    fs.mkdirSync(dst, { recursive: true });
+    for (const entry of fs.readdirSync(src)) {
+      copyPathSync(path.join(src, entry), path.join(dst, entry));
+    }
+  } else {
+    fs.copyFileSync(src, dst);
+  }
+}
+
 const RUNTIME_DATA_DIR = resolveDataDir(process.env.OD_DATA_DIR, PROJECT_ROOT);
 // Canonical (realpath-resolved) form of RUNTIME_DATA_DIR for the few callers
 // that compare it against a user-supplied realpath() result. On macOS, /var
@@ -2065,12 +2136,23 @@ function resolveChatRunShutdownGraceMs() {
 }
 
 export async function startServer({
-  port = 7456,
-  host = process.env.OD_BIND_HOST || '127.0.0.1',
+  port,
+  host,
   returnServer = false,
   desktopPdfExporter = null,
 }: StartServerOptions = {}) {
-  let resolvedPort = port;
+  // Load persisted network settings as fallback layer.
+  const savedPrefs = await readAppConfig(RUNTIME_DATA_DIR).catch(() => ({} as AppConfigPrefs));
+  await initMcpKeyStore(RUNTIME_DATA_DIR);
+  const effectiveHost = host
+    ?? process.env.OD_BIND_HOST
+    ?? savedPrefs.bindHost
+    ?? '127.0.0.1';
+  const effectivePort = port
+    ?? (process.env.OD_PORT ? Number(process.env.OD_PORT) : undefined)
+    ?? savedPrefs.port
+    ?? 7456;
+  let resolvedPort = effectivePort;
   let daemonShuttingDown = false;
   const extraAllowedOrigins = configuredAllowedOrigins();
   const app = express();
@@ -2080,23 +2162,137 @@ export async function startServer({
   // When bound to a non-loopback address (e.g. 0.0.0.0), the
   // daemon is reachable from the LAN. Apply IP allowlist and
   // API key authentication to prevent unauthorized access.
-  const networkExposed = isNetworkExposed(host);
+  const networkExposed = isNetworkExposed(effectiveHost);
+  const authEnabled = networkExposed
+    && (await allValidHashes(RUNTIME_DATA_DIR)).length + (await allMcpKeyHashes(RUNTIME_DATA_DIR)).length > 0;
   if (networkExposed) {
-    const allowedHosts = parseAllowedHosts(process.env.OD_ALLOWED_HOSTS);
+    const envAllowedHosts = parseAllowedHosts(process.env.OD_ALLOWED_HOSTS);
+    const allowedHosts = envAllowedHosts.length > 0
+      ? envAllowedHosts
+      : (Array.isArray(savedPrefs.allowedHosts) ? savedPrefs.allowedHosts : []);
     app.use(createIpAllowlistMiddleware(allowedHosts));
     app.use(createAuthMiddleware({
-      enabled: true,
-      resolveKeys: () => allValidKeys(RUNTIME_DATA_DIR),
+      enabled: authEnabled,
+      networkExposed,
+      isLocalPeer: isLoopbackPeerAddress,
+      resolveHashes: async () => [
+        ...await allValidHashes(RUNTIME_DATA_DIR),
+        ...await allMcpKeyHashes(RUNTIME_DATA_DIR),
+      ],
+      verifyKey,
+      resolveSession: isValidSession,
+      extractSessionCookie,
     }));
-    console.warn(`[od] daemon bound to ${host} — accessible from the network`);
+    console.warn(`[od] daemon bound to ${effectiveHost} — accessible from the network`);
     if (allowedHosts.length === 0) {
-      console.warn('[od] WARNING: no IP allowlist (OD_ALLOWED_HOSTS) configured; all network hosts can connect');
+      console.warn('[od] WARNING: no IP allowlist configured; all network hosts can connect. Set OD_ALLOWED_HOSTS or configure in Settings → Network.');
     }
-    void allValidKeys(RUNTIME_DATA_DIR).then((keys) => {
-      if (keys.length === 0) {
-        console.warn('[od] WARNING: no API keys configured; run `od auth key generate` to create one');
-      }
+    if (!authEnabled) {
+      console.warn('[od] WARNING: no API keys configured — only localhost access allowed; run `od auth key generate` to create one');
+    }
+    // Security headers for network-exposed daemon.
+    app.use((_req, res, next) => {
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+      res.setHeader('X-Frame-Options', 'DENY');
+      res.setHeader('Referrer-Policy', 'same-origin');
+      next();
     });
+  }
+
+  // ── Login gateway for LAN browser access ───────────────────────
+  app.get('/login', (req, res) => {
+    if (!authEnabled) return res.redirect(302, '/');
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-store');
+    const next = typeof req.query.next === 'string' ? req.query.next : '';
+    const isLocal = isLoopbackPeerAddress(req.socket.remoteAddress ?? '');
+    res.send(renderLoginPage(undefined, next, isLocal));
+  });
+
+  app.post('/api/auth/login', express.urlencoded({ extended: false }), async (req, res) => {
+    const ip = req.socket.remoteAddress || 'unknown';
+    const { allowed, retryAfterMs } = checkRateLimit(ip);
+    if (!allowed) {
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      res.setHeader('Retry-After', String(Math.ceil(retryAfterMs / 1000)));
+      res.status(429).send(renderLoginPage('Too many attempts. Try again in a minute.', undefined, isLoopbackPeerAddress(ip)));
+      return;
+    }
+    const key = req.body?.key;
+    if (typeof key !== 'string' || !key.trim()) {
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      res.status(401).send(renderLoginPage('API key is required.', undefined, isLoopbackPeerAddress(ip)));
+      return;
+    }
+    const validHashes = [
+      ...await allValidHashes(RUNTIME_DATA_DIR),
+      ...await allMcpKeyHashes(RUNTIME_DATA_DIR),
+    ];
+    const valid = verifyKey(key.trim(), validHashes);
+    if (!valid) {
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      res.status(401).send(renderLoginPage('Invalid API key.', undefined, isLoopbackPeerAddress(ip)));
+      return;
+    }
+    const { token, cookieName } = createSession();
+    res.setHeader('Set-Cookie', [
+      `${cookieName}=${token}`,
+      'HttpOnly',
+      'SameSite=Strict',
+      'Path=/',
+      `Max-Age=${24 * 60 * 60}`,
+    ].join('; '));
+    const next = typeof req.body?.next === 'string' ? req.body.next : '';
+    const safeNext = next.startsWith('/') && !next.startsWith('//') ? next : '/';
+    res.redirect(302, safeNext);
+  });
+
+  app.post('/api/auth/logout', (req, res) => {
+    const token = extractSessionCookie(req.headers.cookie);
+    if (token) revokeSession(token);
+    res.setHeader('Set-Cookie', [
+      'od_session=',
+      'HttpOnly',
+      'SameSite=Strict',
+      'Path=/',
+      'Max-Age=0',
+    ].join('; '));
+    res.redirect(302, '/login');
+  });
+
+  // ── Emergency key reset (localhost only) ────────────────────────
+  // When all keys are lost, a user with local machine access can
+  // reset everything by visiting /login from localhost and clicking
+  // "Reset all keys". This deletes every API key and MCP key so the
+  // daemon returns to an unauthenticated state.
+  app.post('/api/auth/reset-keys', express.urlencoded({ extended: false }), async (req, res) => {
+    const clientIp = req.socket.remoteAddress ?? '';
+    if (!isLoopbackPeerAddress(clientIp)) {
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      res.status(403).send(renderLoginPage('Key reset is only available from localhost.', undefined, true));
+      return;
+    }
+    const confirmed = req.body?.confirm === 'reset';
+    if (!confirmed) {
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      res.status(400).send(renderLoginPage('Confirmation required.', undefined, true));
+      return;
+    }
+    const apiKeys = await listKeys(RUNTIME_DATA_DIR);
+    for (const k of apiKeys) {
+      await revokeKey(RUNTIME_DATA_DIR, k.id);
+    }
+    const mcpKeys = await listMcpKeys(RUNTIME_DATA_DIR);
+    for (const k of mcpKeys) {
+      await revokeMcpKey(RUNTIME_DATA_DIR, k.id);
+    }
+    bustInstallInfoCache();
+    console.log(`[od] all API keys and MCP keys reset via localhost emergency reset`);
+    res.redirect(302, '/');
+  });
+
+  if (networkExposed) {
+    startCleanupInterval();
   }
 
   // Multi-directory scanning shared by every skill / template surface. The
@@ -2277,9 +2473,15 @@ export async function startServer({
 
   // ── Network config & API key management ────────────────────
   app.get('/api/network-config', async (_req, res) => {
-    const stored = await readNetworkConfig(RUNTIME_DATA_DIR);
-    const config = mergeWithEnv(stored);
-    res.json(config);
+    const prefs = await readAppConfig(RUNTIME_DATA_DIR).catch(() => ({}));
+    const envHost = process.env.OD_BIND_HOST;
+    const envPort = process.env.OD_PORT ? Number(process.env.OD_PORT) : undefined;
+    const envAllowedHosts = parseAllowedHosts(process.env.OD_ALLOWED_HOSTS);
+    res.json({
+      bindHost: envHost ?? prefs.bindHost ?? '127.0.0.1',
+      port: envPort ?? prefs.port ?? 7456,
+      allowedHosts: envAllowedHosts.length > 0 ? envAllowedHosts : (prefs.allowedHosts ?? []),
+    });
   });
 
   app.put('/api/network-config', async (req, res) => {
@@ -2303,12 +2505,11 @@ export async function startServer({
       res.status(400).json({ error: 'INVALID_PORT', reason: 'port must be an integer between 1 and 65535' });
       return;
     }
-    const config = {
+    await writeAppConfig(RUNTIME_DATA_DIR, {
       bindHost: host,
       port: portNum,
       allowedHosts: Array.isArray(allowedHosts) ? allowedHosts.filter((h: unknown) => typeof h === 'string') : [],
-    };
-    await writeNetworkConfig(RUNTIME_DATA_DIR, config);
+    });
     res.json({ ok: true });
   });
 
@@ -2329,6 +2530,39 @@ export async function startServer({
       res.status(404).json({ error: 'NOT_FOUND' });
       return;
     }
+    res.json({ ok: true });
+  });
+
+  // ── MCP key management (AES-256-GCM encrypted, UI-retrievable) ──
+
+  app.get('/api/mcp-keys', async (_req, res) => {
+    const keys = await listMcpKeys(RUNTIME_DATA_DIR);
+    res.json({ keys });
+  });
+
+  app.post('/api/mcp-keys', async (req, res) => {
+    const { label } = req.body ?? {};
+    const entry = await generateMcpKey(RUNTIME_DATA_DIR, typeof label === 'string' ? label : '');
+    bustInstallInfoCache();
+    res.json(entry);
+  });
+
+  app.get('/api/mcp-keys/:id', async (req, res) => {
+    const revealed = await revealMcpKey(RUNTIME_DATA_DIR, req.params.id);
+    if (!revealed) {
+      res.status(404).json({ error: 'NOT_FOUND' });
+      return;
+    }
+    res.json({ id: req.params.id, ...revealed });
+  });
+
+  app.delete('/api/mcp-keys/:id', async (req, res) => {
+    const removed = await revokeMcpKey(RUNTIME_DATA_DIR, req.params.id);
+    if (!removed) {
+      res.status(404).json({ error: 'NOT_FOUND' });
+      return;
+    }
+    bustInstallInfoCache();
     res.json({ ok: true });
   });
 
@@ -2879,7 +3113,7 @@ export async function startServer({
   registerMcpRoutes(app, {
     http: httpDeps,
     paths: pathDeps,
-    mcp: { pendingAuth: mcpPendingAuth, daemonUrlRef },
+    mcp: { pendingAuth: mcpPendingAuth, daemonUrlRef, authEnabled },
   });
   // Project workspace
   registerActiveContextRoutes(app, {
@@ -4604,7 +4838,7 @@ export async function startServer({
     };
     let server;
     try {
-      server = app.listen(port, host, () => {
+      server = app.listen(effectivePort, effectiveHost, () => {
         const address = server.address();
         // `address()` can in theory return `string | AddressInfo | null`. For
         // a TCP listener it's always `AddressInfo` with a `.port` — the guard
@@ -4624,7 +4858,7 @@ export async function startServer({
         // When binding to all interfaces report localhost for local callers;
         // when binding to a specific address (e.g. a Tailscale IP) report that
         // address so remote callers and the sidecar use the correct URL.
-        const reportHost = host === '0.0.0.0' || host === '::' ? '127.0.0.1' : host;
+        const reportHost = effectiveHost === '0.0.0.0' || effectiveHost === '::' ? '127.0.0.1' : effectiveHost;
         const url = `http://${reportHost}:${resolvedPort}`;
         if (!returnServer) {
           console.log(`[od] daemon listening on ${url}`);

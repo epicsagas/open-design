@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 // @ts-nocheck
+import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { startServer } from './server.js';
+import { startServer, resolveProjectRoot, resolveDataDir } from './server.js';
 import { generateKey, listKeys, revokeKey } from './auth-store.js';
-import { resolveDataDir } from './server.js';
 import { runLiveArtifactsMcpServer } from './mcp-live-artifacts-server.js';
 import { runConnectorsToolCli } from './tools-connectors-cli.js';
 import { runLiveArtifactsToolCli } from './tools-live-artifacts-cli.js';
@@ -121,8 +121,8 @@ if (argv[0] === 'tools' && argv[1] === 'live-artifacts') {
     });
 } else {
 // Default: daemon mode.
-let port = Number(process.env.OD_PORT) || 7456;
-let host = process.env.OD_BIND_HOST || '127.0.0.1';
+let port: number | undefined = process.env.OD_PORT ? Number(process.env.OD_PORT) : undefined;
+let host: string | undefined = process.env.OD_BIND_HOST;
 let open = true;
 
 for (let i = 0; i < argv.length; i++) {
@@ -322,7 +322,7 @@ async function runAuth(args) {
     process.exit(2);
   }
   const keySub = args.find((a, i) => i > 0 && !a.startsWith('-')) || '';
-  const PROJECT_ROOT = fileURLToPath(new URL('..', import.meta.url));
+  const PROJECT_ROOT = resolveProjectRoot(path.dirname(fileURLToPath(import.meta.url)));
   const dataDir = resolveDataDir(process.env.OD_DATA_DIR, PROJECT_ROOT);
 
   if (keySub === 'generate') {

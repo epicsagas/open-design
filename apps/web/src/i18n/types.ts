@@ -182,6 +182,7 @@ export interface Dict {
   'settings.generateKey': string;
   'settings.networkRestartHint': string;
   'settings.networkSaveError': string;
+  'settings.networkLoadError': string;
   'settings.themeSystem': string;
   'settings.themeLight': string;
   'settings.themeDark': string;
@@ -494,6 +495,15 @@ export interface Dict {
   'settings.mcpCapabilityPull': string;
   'settings.mcpCapabilityDefault': string;
   'settings.mcpRunningNote': string;
+
+  // MCP Keys
+  'settings.mcpKeysTitle': string;
+  'settings.mcpKeysEmpty': string;
+  'settings.mcpKeysReveal': string;
+  'settings.mcpKeysRevoke': string;
+  'settings.mcpKeysRevokeConfirm': string;
+  'settings.mcpKeysGenerate': string;
+  'settings.mcpKeysNetworkWarning': string;
 
   // Notifications (settings + system notifications)
   'settings.notifications': string;

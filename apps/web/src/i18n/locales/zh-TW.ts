@@ -152,6 +152,7 @@ export const zhTW: Dict = {
   'settings.generateKey': 'Generate',
   'settings.networkRestartHint': 'Changes to bind address, port, or allowed hosts require a daemon restart.',
   'settings.networkSaveError': 'Failed to save. Check your input and try again.',
+  'settings.networkLoadError': 'Failed to load network settings.',
   'settings.themeSystem': '系統',
   'settings.themeLight': '淺色',
   'settings.themeDark': '深色',
@@ -260,6 +261,13 @@ export const zhTW: Dict = {
     '預設使用您在 Open Design 中開啟的專案與檔案，因此您可以說「在我的應用程式中建置這個」，無需重新說明是哪個設計。',
   'settings.mcpRunningNote':
     'Open Design 必須正在執行，MCP 工具呼叫才能成功。如果您在開啟 Open Design 之前就已啟動 coding agent，請重新啟動 agent，使其能夠連線到正在執行的守護行程。',
+  'settings.mcpKeysTitle': 'MCP 金鑰',
+  'settings.mcpKeysEmpty': '沒有 MCP 金鑰。產生一個以自動包含在設定片段中。',
+  'settings.mcpKeysReveal': '顯示',
+  'settings.mcpKeysRevoke': '撤銷',
+  'settings.mcpKeysRevokeConfirm': '確定要撤銷此MCP金鑰嗎？',
+  'settings.mcpKeysNetworkWarning': '已暴露到網路。請生成 MCP 金鑰以啟用身份驗證。',
+  'settings.mcpKeysGenerate': '產生 MCP 金鑰',
 
   'entry.tabDesigns': '我的設計',
   'entry.tabTemplates': '範本',
