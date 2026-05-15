@@ -5012,6 +5012,11 @@ function NetworkSection({ daemonLive }: { daemonLive: boolean }) {
   const [newKeyId, setNewKeyId] = useState<string | null>(null);
   const [label, setLabel] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [pendingRestart, setPendingRestart] = useState(false);
+  const [restarting, setRestarting] = useState(false);
+  const restartingRef = useRef(false);
+  const initialBindHost = useRef<string | null>(null);
+  const initialPort = useRef<number | null>(null);
   const networkExposed = bindHost !== '127.0.0.1' && bindHost !== '::1' && bindHost !== 'localhost';
   const portTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -5029,6 +5034,8 @@ function NetworkSection({ daemonLive }: { daemonLive: boolean }) {
     ]).then(([nc, ak]) => {
       setBindHost(nc.bindHost ?? '127.0.0.1');
       setPort(nc.port ?? 7456);
+      if (initialBindHost.current === null) initialBindHost.current = nc.bindHost ?? '127.0.0.1';
+      if (initialPort.current === null) initialPort.current = nc.port ?? 7456;
       setAllowedHosts(Array.isArray(nc.allowedHosts) ? nc.allowedHosts.join(', ') : '');
       setKeys(ak.keys ?? []);
       setLoaded(true);
@@ -5058,8 +5065,47 @@ function NetworkSection({ daemonLive }: { daemonLive: boolean }) {
         }),
       });
       if (!res.ok) setError(t('settings.networkSaveError'));
+      else {
+        const savedBindHost = (patch.bindHost as string) ?? bindHost;
+        const savedPort = typeof patch.port === 'number' ? patch.port : port;
+        if (savedBindHost !== initialBindHost.current || savedPort !== initialPort.current) {
+          setPendingRestart(true);
+        }
+      }
     } catch {
       setError(t('settings.networkSaveError'));
+    }
+  };
+
+  const restartDaemon = async () => {
+    if (restartingRef.current) return;
+    restartingRef.current = true;
+    setRestarting(true);
+    setError(null);
+    const savedPort = port || 7456;
+    try {
+      await fetch('/api/restart', { method: 'POST' });
+    } catch { /* expected — daemon exits */ }
+    const checkHealth = async (retries: number): Promise<boolean> => {
+      for (let i = 0; i < retries; i++) {
+        await new Promise((resolve) => setTimeout(resolve, 1500));
+        try {
+          const resp = await fetch(`${window.location.protocol}//${window.location.hostname}:${savedPort}/api/health`);
+          if (resp.ok) return true;
+        } catch { /* not back yet */ }
+      }
+      return false;
+    };
+    const back = await checkHealth(30);
+    if (back) {
+      setPendingRestart(false);
+      setRestarting(false);
+      restartingRef.current = false;
+      window.location.href = `${window.location.protocol}//${window.location.hostname}:${savedPort}`;
+    } else {
+      setRestarting(false);
+      restartingRef.current = false;
+      setError(t('settings.restartFailed'));
     }
   };
 
@@ -5172,7 +5218,20 @@ function NetworkSection({ daemonLive }: { daemonLive: boolean }) {
         </>
       )}
 
-      <p className="hint" style={{ marginTop: '16px' }}>{t('settings.networkRestartHint')}</p>
+      {pendingRestart && !restarting && (
+        <div style={{ marginTop: '16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <p className="hint" style={{ margin: 0 }}>{t('settings.networkRestartHint')}</p>
+          <button type="button" className="seg-btn active" onClick={restartDaemon}>{t('settings.restartDaemon')}</button>
+        </div>
+      )}
+      {restarting && (
+        <div style={{ marginTop: '16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <p className="hint" style={{ margin: 0 }}>{t('settings.restartingDaemon')}</p>
+        </div>
+      )}
+      {!pendingRestart && !restarting && (
+        <p className="hint" style={{ marginTop: '16px' }}>{t('settings.networkRestartHint')}</p>
+      )}
     </section>
   );
 }
