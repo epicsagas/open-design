@@ -17,14 +17,14 @@ import {
 } from './prompts/system.js';
 import { expandHomePrefix, resolveProjectRelativePath } from './home-expansion.js';
 import { createAuthMiddleware } from './auth-middleware.js';
-import { allValidHashes, verifyKey, generateKey, listKeys, revokeKey } from './auth-store.js';
-import { initMcpKeyStore, allMcpKeyHashes, generateMcpKey, listMcpKeys, revealMcpKey, revokeMcpKey } from './mcp-key-store.js';
+import { allValidHashes, verifyKey, generateKey, listKeys, revokeKey, clearAllKeys } from './auth-store.js';
+import { initMcpKeyStore, allMcpKeyHashes, generateMcpKey, listMcpKeys, revealMcpKey, revokeMcpKey, clearAllMcpKeys } from './mcp-key-store.js';
 import { setShellEnvVar } from './shell-env.js';
 import { createIpAllowlistMiddleware } from './ip-allowlist.js';
 import { renderLoginPage } from './login-page.js';
 import { isNetworkExposed, parseAllowedHosts } from './network-config.js';
 import { checkRateLimit, startCleanupInterval as startRateLimitCleanup } from './login-rate-limit.js';
-import { createSession, extractSessionCookie, isValidSession, revokeSession, startCleanupInterval } from './session-store.js';
+import { clearAllSessions, createSession, extractSessionCookie, isValidSession, revokeSession, startCleanupInterval } from './session-store.js';
 import { createCommandInvocation } from '@open-design/platform';
 import { SIDECAR_DEFAULTS, SIDECAR_ENV } from '@open-design/sidecar-proto';
 import {
@@ -1109,15 +1109,13 @@ const mcpPendingAuth = new PendingAuthCache();
  * ERR_CONNECTION_REFUSED. Misconfiguration is loud: the OAuth provider
  * will reject `redirect_uri` mismatches.
  */
-function getPublicBaseUrl(req) {
+function getPublicBaseUrl(_req) {
   const env = process.env.OD_PUBLIC_BASE_URL;
   if (env && /^https?:\/\//i.test(env)) {
     return env.replace(/\/+$/u, '');
   }
-  const proto = req.protocol || 'http';
-  const host = req.get('host');
-  if (!host) return `http://localhost:${process.env.OD_PORT ?? '7456'}`;
-  return `${proto}://${host}`;
+  const port = process.env.OD_PORT ?? '7456';
+  return `http://127.0.0.1:${port}`;
 }
 
 function mcpOAuthCallbackUrl(req) {
@@ -2293,14 +2291,8 @@ export async function startServer({
       res.status(400).send(renderLoginPage('Confirmation required.', undefined, true));
       return;
     }
-    const apiKeys = await listKeys(RUNTIME_DATA_DIR);
-    for (const k of apiKeys) {
-      await revokeKey(RUNTIME_DATA_DIR, k.id);
-    }
-    const mcpKeys = await listMcpKeys(RUNTIME_DATA_DIR);
-    for (const k of mcpKeys) {
-      await revokeMcpKey(RUNTIME_DATA_DIR, k.id);
-    }
+    await clearAllKeys(RUNTIME_DATA_DIR);
+    await clearAllMcpKeys(RUNTIME_DATA_DIR);
     bustInstallInfoCache();
     await refreshAuthEnabled();
     console.log(`[od] all API keys and MCP keys reset via localhost emergency reset`);
@@ -2569,6 +2561,7 @@ export async function startServer({
     const { label } = req.body ?? {};
     const entry = await generateKey(RUNTIME_DATA_DIR, typeof label === 'string' ? label : '');
     await refreshAuthEnabled();
+    clearAllSessions();
     res.json(entry);
   });
 
@@ -2583,6 +2576,7 @@ export async function startServer({
       return;
     }
     await refreshAuthEnabled();
+    clearAllSessions();
     res.json({ ok: true });
   });
 
@@ -2606,6 +2600,7 @@ export async function startServer({
     const entry = await generateMcpKey(RUNTIME_DATA_DIR, typeof label === 'string' ? label : '');
     bustInstallInfoCache();
     await refreshAuthEnabled();
+    clearAllSessions();
     let shellEnvFile: string | null = null;
     try {
       const result = await setShellEnvVar('OD_MCP_TOKEN', entry.key);
@@ -2641,6 +2636,8 @@ export async function startServer({
     }
     bustInstallInfoCache();
     await refreshAuthEnabled();
+    clearAllSessions();
+    try { await setShellEnvVar('OD_MCP_TOKEN', ''); } catch { /* best-effort */ }
     res.json({ ok: true });
   });
 

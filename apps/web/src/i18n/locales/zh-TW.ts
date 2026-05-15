@@ -266,6 +266,7 @@ export const zhTW: Dict = {
     'Open Design 必須正在執行，MCP 工具呼叫才能成功。如果您在開啟 Open Design 之前就已啟動 coding agent，請重新啟動 agent，使其能夠連線到正在執行的守護行程。',
   'settings.mcpTabLocal': '本機',
   'settings.mcpTabRemote': '遠端',
+  'settings.mcpInstallTypeAria': 'MCP install type',
   'settings.mcpRemoteDisabled':
     '遠端存取需要將守護行程繫結至非回送位址。請使用 --host 0.0.0.0 啟動或設定 OD_BIND_HOST 以在網路上公開守護行程。',
   'settings.mcpKeysTitle': 'MCP 金鑰',

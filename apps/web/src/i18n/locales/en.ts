@@ -275,6 +275,7 @@ export const en: Dict = {
     'Open Design must be running for MCP tool calls to succeed. If you started your coding agent before opening Open Design, restart the agent so it can reach the live daemon.',
   'settings.mcpTabLocal': 'Local',
   'settings.mcpTabRemote': 'Remote',
+  'settings.mcpInstallTypeAria': 'MCP install type',
   'settings.mcpRemoteDisabled':
     'Remote access requires the daemon to be bound to a non-loopback address. Start with --host 0.0.0.0 or set OD_BIND_HOST to expose the daemon on the network.',
   'settings.mcpKeysTitle': 'MCP Keys',
@@ -285,7 +286,7 @@ export const en: Dict = {
   'settings.mcpKeysNetworkWarning': 'Daemon is exposed to the network. Generate an MCP key to enable authentication.',
   'settings.mcpKeysGenerate': 'Generate token',
   'settings.mcpKeysRotate': 'Rotate token',
-  'settings.mcpKeysShellEnv': '$OD_MCP_TOKEN saved to {file}',
+  'settings.mcpKeysShellEnv': '$OD_MCP_TOKEN saved to {file}. Run `pm2 restart` (or restart your MCP client) for the new token to take effect.',
 
   'entry.tabDesigns': 'Designs',
   'entry.tabTemplates': 'Templates',

@@ -179,6 +179,7 @@ export const ptBR: Dict = {
   'settings.mcpServerHint': 'Exponha o Open Design como servidor MCP para o seu agente de código.',
   'settings.mcpTabLocal': 'Local',
   'settings.mcpTabRemote': 'Remoto',
+  'settings.mcpInstallTypeAria': 'MCP install type',
   'settings.mcpRemoteDisabled':
     'O acesso remoto requer que o daemon esteja vinculado a um endereço não-loopback. Inicie com --host 0.0.0.0 ou defina OD_BIND_HOST para expor o daemon na rede.',
   'settings.mcpKeysTitle': 'Chaves MCP',

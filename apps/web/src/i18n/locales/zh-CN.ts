@@ -273,6 +273,7 @@ export const zhCN: Dict = {
     'Open Design 必须处于运行状态，MCP 工具调用才能成功。如果你在打开 Open Design 之前启动了编码助手，请重启助手以便它能连接到正在运行的守护进程。',
   'settings.mcpTabLocal': '本地',
   'settings.mcpTabRemote': '远程',
+  'settings.mcpInstallTypeAria': 'MCP install type',
   'settings.mcpRemoteDisabled':
     '远程访问需要将守护进程绑定到非环回地址。请使用 --host 0.0.0.0 启动或设置 OD_BIND_HOST 以在网络上公开守护进程。',
   'settings.mcpKeysTitle': 'MCP 密钥',

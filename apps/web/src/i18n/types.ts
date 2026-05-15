@@ -500,6 +500,7 @@ export interface Dict {
   'settings.mcpRunningNote': string;
   'settings.mcpTabLocal': string;
   'settings.mcpTabRemote': string;
+  'settings.mcpInstallTypeAria': string;
   'settings.mcpRemoteDisabled': string;
 
   // MCP Keys

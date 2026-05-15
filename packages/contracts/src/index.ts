@@ -19,6 +19,7 @@ export * from './api/proxy';
 export * from './api/routines';
 export * from './api/registry';
 export * from './api/research';
+export * from './api/daemon-auth';
 export * from './api/version';
 export * from './examples';
 export * from './sse/common';
