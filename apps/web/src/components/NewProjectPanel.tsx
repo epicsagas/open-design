@@ -142,7 +142,7 @@ interface Props {
   designSystems: DesignSystemSummary[];
   defaultDesignSystemId: string | null;
   templates: ProjectTemplate[];
-  onDeleteTemplate: (id: string) => Promise<boolean>;
+  onDeleteTemplate?: (id: string) => Promise<boolean>;
   promptTemplates: PromptTemplateSummary[];
   onCreate: (input: CreateInput & { requestId?: string }) => void;
   onImportClaudeDesign?: (file: File) => Promise<void> | void;
@@ -1333,7 +1333,7 @@ function TemplatePicker({
   templates: ProjectTemplate[];
   value: string | null;
   onChange: (id: string | null) => void;
-  onDelete: (id: string) => Promise<boolean>;
+  onDelete?: (id: string) => Promise<boolean>;
 }) {
   const t = useT();
   return (
@@ -1361,10 +1361,10 @@ function TemplatePicker({
                 key={tpl.id}
                 active={value === tpl.id}
                 onClick={() => onChange(tpl.id)}
-                onDelete={async () => {
+                onDelete={onDelete ? async () => {
                   const ok = await onDelete(tpl.id);
                   if (ok && value === tpl.id) onChange(null);
-                }}
+                } : () => {}}
                 name={tpl.name}
                 description={tpl.description ?? fallbackDesc}
               />

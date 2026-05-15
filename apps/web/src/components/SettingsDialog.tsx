@@ -114,6 +114,12 @@ export type SettingsSection =
   | 'designSystems'
   | 'memory'
   | 'privacy'
+  // 'library' is consumed by the EntryShell library route — App opens it
+  // via this same openSettings entry point, so SettingsSection must
+  // accept the token even though SettingsDialog itself has no Library
+  // section. Reconcile follow-up: route library through a dedicated
+  // navigate() call so openSettings only owns dialog-bound sections.
+  | 'library'
   | 'about';
 
 interface Props {
@@ -1477,6 +1483,9 @@ export function SettingsDialog({
       subtitle: t('settings.designSystemsHint'),
     },
     memory: { title: t('settings.memory'), subtitle: t('settings.memoryHint') },
+    // 'library' is opened via EntryShell route — SettingsDialog doesn't
+    // render it but SettingsSection must accept the token (see type def).
+    library: { title: '', subtitle: '' },
     about: { title: t('settings.about'), subtitle: t('settings.aboutHint') },
   };
   const activeHeader = sectionHeader[activeSection];
@@ -2890,7 +2899,7 @@ export function deriveComposioCredentialState(
   return 'empty';
 }
 
-function ConnectorSection({
+export function ConnectorSection({
   cfg,
   setCfg,
   composioConfigLoading = false,

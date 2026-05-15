@@ -1136,15 +1136,9 @@ export const th: Dict = {
   'pet.overlayAria': 'เป็นโชว์แผงของสัตว์',
   'pet.spriteAria': 'นี่ของ {name} — ตัวกดจับลากและแชทเข้าพูด',
   'pet.spriteTitle': 'แวะมาหวัดดีจาก {name}! จิ้มมาสนทนากัน',
-  'pet.railAria': 'กดเครื่องหมายเปิดตัวเลือกหาสัตว์',
-  'pet.railTitle': 'เพื่อนสัตว์เลี้ยง',
-  'pet.railHint': 'ดูมาไว้คอยอยู่เป็นเพื่อนในกระดาน',
-  'pet.railExpand': 'กางเปิดแถบดูสัตว์มาโชว์',
-  'pet.railCollapse': 'พับแถบตัวสัตว์หดเข้าตัว',
-  'pet.railHide': 'ปิดแผงการมองไม่ให้เห็นมาเลย',
-  'pet.railShow': 'กลับมาแสดงตัวที่ตัวเลือกสัตว์ให้รู้ไป',
-  'pet.railCustomFlavor': 'แบบฉบับเอาที่มี — ใส่เองมาหมดด้วยชื่อ สี และอีโมจิ',
-  'pet.railCustomize': 'ปรับแต่งเอาเองเลย…',
+  // PetRail-specific keys removed: PetRail sidebar was dropped when the
+  // EntryView merged to the EntryShell layout. Restore these keys if the
+  // PetRail UI is brought back to EntryShell.
   'pet.composerTitle': 'เพื่อนสัตว์เลี้ยง — เรียกตื่น ม้วนไปนอน หรือเอาอันไหนสักที',
   'pet.composerMenuTitle': 'เพื่อนสัตว์เลี้ยง',
   'pet.composerMenuHint': 'ตัวเลือกพิเศษ: ลองพิมพ์ /pet เพื่อเปลี่ยนการใช้งานโหมด',
