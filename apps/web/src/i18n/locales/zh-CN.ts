@@ -274,7 +274,7 @@ export const zhCN: Dict = {
   'settings.mcpTabLocal': '本地',
   'settings.mcpTabRemote': '远程',
   'settings.mcpRemoteDisabled':
-    '远程访问需要守护进程绑定到非回环地址。请使用 --host 0.0.0.0 启动或设置 OD_BIND_HOST 以在网络上公开守护进程。',
+    '远程访问需要将守护进程绑定到非环回地址。请使用 --host 0.0.0.0 启动或设置 OD_BIND_HOST 以在网络上公开守护进程。',
   'settings.mcpKeysTitle': 'MCP 密钥',
   'settings.mcpKeysEmpty': '暂无 MCP 密钥。生成后可自动包含在配置片段中。',
   'settings.mcpKeysReveal': '显示',

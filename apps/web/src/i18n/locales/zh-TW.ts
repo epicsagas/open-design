@@ -267,7 +267,7 @@ export const zhTW: Dict = {
   'settings.mcpTabLocal': '本機',
   'settings.mcpTabRemote': '遠端',
   'settings.mcpRemoteDisabled':
-    '遠端存取需要守護行程綁定到非回環位址。請使用 --host 0.0.0.0 啟動或設定 OD_BIND_HOST 以在網路上公開守護行程。',
+    '遠端存取需要將守護行程繫結至非回送位址。請使用 --host 0.0.0.0 啟動或設定 OD_BIND_HOST 以在網路上公開守護行程。',
   'settings.mcpKeysTitle': 'MCP 金鑰',
   'settings.mcpKeysEmpty': '尚無 MCP 金鑰。產生後可自動包含在設定片段中。',
   'settings.mcpKeysReveal': '顯示',
