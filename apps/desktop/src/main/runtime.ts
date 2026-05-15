@@ -440,6 +440,7 @@ const MAC_WINDOW_CHROME =
 const MAC_WINDOW_CHROME_CSS = `
   .app-chrome-header {
     --app-chrome-traffic-space: 56px !important;
+    --app-chrome-traffic-margin: 8px !important;
     -webkit-app-region: drag;
   }
   .app-chrome-traffic-space {
@@ -474,7 +475,10 @@ const MAC_WINDOW_CHROME_CSS = `
   .prompt-template-lightbox-backdrop * {
     -webkit-app-region: no-drag;
   }
-  .entry-brand,
+  .entry-brand {
+    -webkit-app-region: drag;
+    padding-top: 32px !important;
+  }
   .entry-header {
     -webkit-app-region: drag;
   }
