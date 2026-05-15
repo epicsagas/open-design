@@ -261,6 +261,10 @@ export const zhTW: Dict = {
     '預設使用您在 Open Design 中開啟的專案與檔案，因此您可以說「在我的應用程式中建置這個」，無需重新說明是哪個設計。',
   'settings.mcpRunningNote':
     'Open Design 必須正在執行，MCP 工具呼叫才能成功。如果您在開啟 Open Design 之前就已啟動 coding agent，請重新啟動 agent，使其能夠連線到正在執行的守護行程。',
+  'settings.mcpTabLocal': '本機',
+  'settings.mcpTabRemote': '遠端',
+  'settings.mcpRemoteDisabled':
+    '遠端存取需要守護行程綁定到非回環位址。請使用 --host 0.0.0.0 啟動或設定 OD_BIND_HOST 以在網路上公開守護行程。',
   'settings.mcpKeysTitle': 'MCP 金鑰',
   'settings.mcpKeysEmpty': '尚無 MCP 金鑰。產生後可自動包含在設定片段中。',
   'settings.mcpKeysReveal': '顯示',

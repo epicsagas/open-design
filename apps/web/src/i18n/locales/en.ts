@@ -270,6 +270,10 @@ export const en: Dict = {
     'Default to the project and file you have open in Open Design, so you can say "build this in my app" without re-stating which design.',
   'settings.mcpRunningNote':
     'Open Design must be running for MCP tool calls to succeed. If you started your coding agent before opening Open Design, restart the agent so it can reach the live daemon.',
+  'settings.mcpTabLocal': 'Local',
+  'settings.mcpTabRemote': 'Remote',
+  'settings.mcpRemoteDisabled':
+    'Remote access requires the daemon to be bound to a non-loopback address. Start with --host 0.0.0.0 or set OD_BIND_HOST to expose the daemon on the network.',
   'settings.mcpKeysTitle': 'MCP Keys',
   'settings.mcpKeysEmpty': 'No MCP keys. Generate one to auto-include in config snippets.',
   'settings.mcpKeysReveal': 'Reveal',

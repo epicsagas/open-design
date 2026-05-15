@@ -268,6 +268,10 @@ export const zhCN: Dict = {
     '默认使用你在 Open Design 中打开的项目和文件，因此你可以直接说"在我的应用中构建这个"，无需重复说明是哪个设计。',
   'settings.mcpRunningNote':
     'Open Design 必须处于运行状态，MCP 工具调用才能成功。如果你在打开 Open Design 之前启动了编码助手，请重启助手以便它能连接到正在运行的守护进程。',
+  'settings.mcpTabLocal': '本地',
+  'settings.mcpTabRemote': '远程',
+  'settings.mcpRemoteDisabled':
+    '远程访问需要守护进程绑定到非回环地址。请使用 --host 0.0.0.0 启动或设置 OD_BIND_HOST 以在网络上公开守护进程。',
   'settings.mcpKeysTitle': 'MCP 密钥',
   'settings.mcpKeysEmpty': '暂无 MCP 密钥。生成后可自动包含在配置片段中。',
   'settings.mcpKeysReveal': '显示',

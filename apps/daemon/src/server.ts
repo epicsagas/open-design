@@ -235,6 +235,7 @@ import { LiveArtifactRefreshAbortError } from './live-artifacts/refresh.js';
 import { registerConnectorRoutes } from './connectors/routes.js';
 import { registerActiveContextRoutes } from './active-context-routes.js';
 import { registerMcpRoutes, bustInstallInfoCache } from './mcp-routes.js';
+import { createMcpHttpHandler } from './mcp-http.js';
 import { registerLiveArtifactRoutes } from './live-artifact-routes.js';
 import { registerDeployRoutes, registerDeploymentCheckRoutes } from './deploy-routes.js';
 import { registerMediaRoutes } from './media-routes.js';
@@ -3115,6 +3116,11 @@ export async function startServer({
     paths: pathDeps,
     mcp: { pendingAuth: mcpPendingAuth, daemonUrlRef, authEnabled },
   });
+
+  // Streamable HTTP MCP endpoint — remote agents connect here.
+  const mcpHttpHandler = createMcpHttpHandler(daemonUrl);
+  app.post('/mcp', mcpHttpHandler);
+  app.get('/mcp', mcpHttpHandler);
   // Project workspace
   registerActiveContextRoutes(app, {
     db,
