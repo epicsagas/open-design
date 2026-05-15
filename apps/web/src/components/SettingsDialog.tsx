@@ -4295,7 +4295,7 @@ function IntegrationsSection() {
       },
       buildSnippetLang: () => 'bash',
       buildRemoteSnippet: (info) => {
-        const server: Record<string, unknown> = { url: info.remoteUrl ?? '' };
+        const server: Record<string, unknown> = { type: 'http', url: info.remoteUrl ?? '' };
         const headers = buildRemoteHeaders(info);
         if (Object.keys(headers).length > 0) server.headers = headers;
         const inner = JSON.stringify(server);
