@@ -169,6 +169,15 @@ export function isLocalSameOrigin(
 
   const localHostAllowed = isAllowedBrowserHost(host, ports, resolvedBindHost, ipOnlyExtraOrigins);
   if (origin == null || origin === '') return localHostAllowed;
+  // Reverse-proxy deployments (e.g. Nginx in front of the daemon) terminate
+  // the browser connection at the proxy and open a fresh upstream
+  // connection to the daemon. The Host header the daemon sees is the
+  // proxy upstream's address, not the browser-visible origin, so the host
+  // check below fails even when the user explicitly listed their proxy
+  // origin in OD_ALLOWED_ORIGINS. Trust the Origin header in that case:
+  // a client-supplied origin that exactly matches an explicitly allow-
+  // listed entry is the documented escape hatch for these deployments.
+  if (extraAllowedOrigins.includes(origin)) return true;
   if (!isAllowedBrowserHost(host, ports, resolvedBindHost, extraAllowedOrigins)) return false;
   return isAllowedBrowserOrigin(origin, host, ports, resolvedBindHost, extraAllowedOrigins);
 }
