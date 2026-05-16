@@ -63,6 +63,7 @@ export function isPrivateIpv4(hostname: unknown): boolean {
   const [a, b] = octets as [number, number, number, number];
   return (
     a === 10 ||
+    (a === 100 && b >= 64 && b <= 127) ||
     (a === 172 && b >= 16 && b <= 31) ||
     (a === 192 && b === 168) ||
     (a === 169 && b === 254)
@@ -155,20 +156,21 @@ export function isLocalSameOrigin(
   req: RequestWithOriginHeaders,
   port: number | string | null | undefined,
   env: NodeJS.ProcessEnv = process.env,
+  bindHost?: string,
 ): boolean {
   const host = String(headerValue(req.headers?.host) || '');
   const origin = headerValue(req.headers?.origin);
   const ports = allowedBrowserPorts(port, env);
-  const bindHost = env.OD_BIND_HOST || '127.0.0.1';
+  const resolvedBindHost = bindHost ?? (env.OD_BIND_HOST || '127.0.0.1');
   const extraAllowedOrigins = configuredAllowedOrigins(env);
   const ipOnlyExtraOrigins = extraAllowedOrigins.filter((o) =>
     isIpLiteralHostname(new URL(o).hostname),
   );
 
-  const localHostAllowed = isAllowedBrowserHost(host, ports, bindHost, ipOnlyExtraOrigins);
+  const localHostAllowed = isAllowedBrowserHost(host, ports, resolvedBindHost, ipOnlyExtraOrigins);
   if (origin == null || origin === '') return localHostAllowed;
-  if (!isAllowedBrowserHost(host, ports, bindHost, extraAllowedOrigins)) return false;
-  return isAllowedBrowserOrigin(origin, host, ports, bindHost, extraAllowedOrigins);
+  if (!isAllowedBrowserHost(host, ports, resolvedBindHost, extraAllowedOrigins)) return false;
+  return isAllowedBrowserOrigin(origin, host, ports, resolvedBindHost, extraAllowedOrigins);
 }
 
 function headerValue(value: unknown): string | undefined {
