@@ -76,7 +76,7 @@ OD stands on four open-source shoulders:
 | **Auto-launch** | Packaged desktop app registers as a macOS login item via `app.setLoginItemSettings()` — toggle in Settings → Desktop. Dev mode (`pnpm tools-dev`) is excluded automatically (`app.isPackaged` guard). Headless daemon auto-start via LaunchAgent plist or Nix Home Manager → [`docs/self-hosting.md`](docs/self-hosting.md) |
 | **Network security** | Bind to `0.0.0.0` with IP allowlist (`OD_ALLOWED_HOSTS`) + API key auth (`od auth key generate`). Tailscale devices (100.64.0.0/10) auto-detected and skip auth. Full guide → [`docs/network-security.md`](docs/network-security.md) |
 | **Desktop** | Optional Electron shell with sandboxed renderer + sidecar IPC (STATUS / EVAL / SCREENSHOT / CONSOLE / CLICK / SHUTDOWN) — drives `tools-dev inspect desktop screenshot` for E2E |
-| **Deployable to** | Local (`pnpm tools-dev`) · Vercel web layer · packaged Electron desktop app for macOS (Apple Silicon) and Windows (x64) — download from [open-design.ai](https://open-design.ai/) or the [latest release](https://github.com/nexu-io/open-design/releases) |
+| **Deployable to** | Local (`pnpm tools-dev`) · Vercel web layer · packaged Electron desktop app for macOS (Apple Silicon, plus Intel x64 ZIP builds verified on Monterey) and Windows (x64) — download from [open-design.ai](https://open-design.ai/) or the [latest release](https://github.com/nexu-io/open-design/releases) |
 | **License** | Apache-2.0 |
 
 Linux AppImage packaging is available through the optional release lane and is covered by the Linux packaged smoke workflow, but public stable downloads remain gated until the release maintainers enable the Linux stable lane.
@@ -986,9 +986,7 @@ Long-form provenance write-up — what we take from each, what we deliberately d
 - [ ] Vercel + tunnel deployment recipe (Topology B)
 - [ ] One-command `npx od init` to scaffold a project with `DESIGN.md`
 - [ ] Skill marketplace (`od skills install <github-repo>`) and `od skill add | list | remove | test` CLI surface (drafted in [`docs/skills-protocol.md`](docs/skills-protocol.md), implementation pending)
-- [x] Packaged Electron build out of `apps/packaged/` — macOS (Apple Silicon) and Windows (x64) downloads on [open-design.ai](https://open-design.ai/) and the [GitHub releases page](https://github.com/nexu-io/open-design/releases)
-- [x] Auto-launch support — macOS login item for packaged desktop app (`Settings → Desktop`), LaunchAgent plist and Nix Home Manager for headless daemon → [`docs/self-hosting.md`](docs/self-hosting.md)
-- [x] Network security — IP allowlist + API key auth for `0.0.0.0` exposure; Tailscale integration with zero-config WireGuard access → [`docs/network-security.md`](docs/network-security.md)
+- [x] Packaged Electron build out of `apps/packaged/` — macOS (Apple Silicon, with Intel x64 ZIP builds verified on Monterey) and Windows (x64) downloads on [open-design.ai](https://open-design.ai/) and the [GitHub releases page](https://github.com/nexu-io/open-design/releases)
 
 Phased delivery → [`docs/roadmap.md`](docs/roadmap.md).
 
