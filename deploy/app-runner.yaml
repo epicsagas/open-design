@@ -1,10 +1,23 @@
+# AWS App Runner config — https://docs.aws.amazon.com/apprunner/latest/dg/config-file-ref.html
+# For source-based Docker builds from the repo.
+# Pre-built image deployment uses the CLI directly (see install.sh cloud_deploy_apprunner).
+#
+# CLI (pre-built image):
+#   aws apprunner create-service \
+#     --service-name open-design \
+#     --source-configuration "ImageRepository={ImageIdentifier=docker.io/vanjayak/open-design:latest,ImageRepositoryType=ECR_PUBLIC}" \
+#     --port-configuration "Port=7456,Protocol=HTTP" \
+#     --health-check-configuration "Protocol=HTTP,Path=/api/health,Interval=30,Timeout=5"
+#
+# Source-based (this file):
+#   Connect GitHub repo in App Runner console → detects apprunner.yaml
+
 version: 1.0
 runtime: docker
 build:
-  dockerfile: deploy/Dockerfile
+  dockerfile: Dockerfile
   context: .
 run:
-  image: docker.io/vanjayak/open-design:latest
   env:
     - name: NODE_ENV
       value: production

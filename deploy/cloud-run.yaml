@@ -8,8 +8,6 @@ spec:
   template:
     metadata:
       annotations:
-        run.googleapis.com/memory: "512Mi"
-        run.googleapis.com/cpu: "1"
         run.googleapis.com/max-scale: "3"
         run.googleapis.com/min-scale: "0"
     spec:
@@ -40,7 +38,6 @@ spec:
             httpGet:
               path: /api/health
               port: 7456
-            initialDelaySeconds: 5
             periodSeconds: 5
             failureThreshold: 12
           livenessProbe:

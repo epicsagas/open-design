@@ -1,34 +1,22 @@
-name: open-design
-
-services:
-  - name: open-design
-    instance_type: nano
-    regions:
-      - fra
-    image:
-      image: docker.io/vanjayak/open-design:latest
-      command: ""
-    env:
-      - key: NODE_ENV
-        value: production
-      - key: OD_BIND_HOST
-        value: "0.0.0.0"
-      - key: OD_PORT
-        value: "7456"
-      - key: OD_ALLOWED_ORIGINS
-        value: ""
-      - key: OD_API_TOKEN
-        value: ""
-    ports:
-      - port: 7456
-        protocol: http
-    health_checks:
-      - protocol: http
-        port: 7456
-        path: /api/health
-        interval: 30s
-        timeout: 5s
-    volumes:
-      - name: open-design-data
-        mount_path: /app/.od
-        size: "1GB"
+# Koyeb deployment reference — https://www.koyeb.com/docs/reference/services
+# Koyeb does not use a YAML config file. Deploy via CLI or dashboard.
+#
+# CLI:
+#   koyeb service create open-design \
+#     --docker docker.io/vanjayak/open-design:latest \
+#     --port 7456 \
+#     --env NODE_ENV=production \
+#     --env OD_BIND_HOST=0.0.0.0 \
+#     --env OD_PORT=7456
+#
+# Dashboard:
+#   1. https://app.koyeb.com/apps/create
+#   2. Select "Docker Image"
+#   3. Image: docker.io/vanjayak/open-design:latest
+#   4. Expose port 7456 (HTTP)
+#   5. Add environment variables:
+#      - NODE_ENV=production
+#      - OD_BIND_HOST=0.0.0.0
+#      - OD_PORT=7456
+#   6. Health check: HTTP GET /api/health on port 7456
+#   7. Instance type: nano (or smallest available)

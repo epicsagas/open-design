@@ -1,35 +1,12 @@
+# Railway config-as-code — https://docs.railway.com/config-as-code/reference
+# Deploy with: railway up
+# Set secrets via: railway variables set OD_API_TOKEN=your-token
+
 [build]
-  image = "docker.io/vanjayak/open-design:latest"
+builder = "DOCKERFILE"
 
 [deploy]
-  healthcheckPath = "/api/health"
-  healthcheckTimeout = 300
-  restartPolicyType = "on_failure"
-  restartPolicyMaxRetries = 3
-
-[[services.env]]
-  name = "NODE_ENV"
-  value = "production"
-
-[[services.env]]
-  name = "OD_BIND_HOST"
-  value = "0.0.0.0"
-
-[[services.env]]
-  name = "OD_PORT"
-  value = "7456"
-
-[[services.env]]
-  name = "OD_ALLOWED_ORIGINS"
-
-[[services.env]]
-  name = "OD_API_TOKEN"
-
-[[services.variables]]
-  name = "OD_DATA_DIR"
-  value = "/data/od"
-
-[[volumes]]
-  name = "open-design-data"
-  mountPath = "/data/od"
-  size = "1GB"
+healthcheckPath = "/api/health"
+healthcheckTimeout = 300
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 3

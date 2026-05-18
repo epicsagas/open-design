@@ -345,14 +345,22 @@ cloud_deploy_koyeb() {
     info "  1. Go to https://app.koyeb.com/apps/create"
     info "  2. Select 'Docker Image'"
     info "  3. Enter: docker.io/vanjayak/open-design:latest"
-    info "  4. Set port 7456, add env vars"
-    info "  5. Deploy"
+    info "  4. Expose port 7456 (HTTP)"
+    info "  5. Add env vars: NODE_ENV, OD_BIND_HOST, OD_PORT"
+    info "  6. Deploy"
     return 0
   fi
 
   info "Deploying to Koyeb..."
-  koyeb service create open-design --docker docker.io/vanjayak/open-design:latest --port 7456 2>&1 || {
-    error "Koyeb deploy failed."
+  koyeb apps create open-design 2>/dev/null || true
+  koyeb services create open-design \
+    --app open-design \
+    --docker docker.io/vanjayak/open-design:latest \
+    --ports 7456:http \
+    --env "NODE_ENV=production" \
+    --env "OD_BIND_HOST=0.0.0.0" \
+    --env "OD_PORT=7456" 2>&1 || {
+    error "Koyeb deploy failed. See deploy/koyeb.yaml for reference."
     return 1
   }
   success "Deployed to Koyeb."

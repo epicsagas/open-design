@@ -1,7 +1,7 @@
 services:
   - type: web
     name: open-design
-    runtime: docker
+    runtime: image
     image:
       url: docker.io/vanjayak/open-design:latest
     plan: starter

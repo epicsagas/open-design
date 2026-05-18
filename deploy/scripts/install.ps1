@@ -9,7 +9,7 @@
 .PARAMETER NonInteractive
     Use defaults for all prompts (no user input).
 .PARAMETER Mode
-    Installation mode: 'docker' or 'node'. If omitted, prompts when Docker is available.
+    Installation mode: 'docker', 'node', or 'cloud'. If omitted, prompts when Docker is available.
 .PARAMETER Port
     Host port to expose (default: 7456).
 .PARAMETER Image
@@ -24,7 +24,7 @@
 [CmdletBinding()]
 param(
     [switch]$NonInteractive,
-    [ValidateSet('docker','node','')]
+    [ValidateSet('docker','node','cloud','')]
     [string]$Mode = '',
     [int]$Port = 7456,
     [string]$Image = 'docker.io/vanjayak/open-design:latest',
@@ -127,6 +127,133 @@ if ($portInUse) {
         Write-Err "Port $Port is occupied. Use -Port to specify a different one."
         exit 1
     }
+}
+
+# =========================================================================
+# CLOUD MODE
+# =========================================================================
+if ($installMode -eq 'cloud') {
+
+    Write-Host ""
+    Write-Info "Cloud deployment platforms:"
+    Write-Host "  1) Fly.io          — Global edge, persistent volumes"
+    Write-Host "  2) Railway         — Git-based, zero config"
+    Write-Host "  3) Render          — Blueprint from render.yaml"
+    Write-Host "  4) Google Cloud Run— Serverless containers"
+    Write-Host "  5) AWS App Runner  — Managed container service"
+    Write-Host "  6) Koyeb           — Global edge deployment"
+    Write-Host ""
+
+    if ($NonInteractive) {
+        Write-Err "Cloud mode requires interactive platform selection."
+        Write-Info "Use platform CLIs directly with config files in deploy\:"
+        Write-Info "  fly deploy -c deploy\fly.toml"
+        Write-Info "  railway up"
+        Write-Info "  gcloud run deploy --image docker.io/vanjayak/open-design:latest"
+        exit 1
+    }
+
+    $choice = Read-Host "Choose platform (1-6) [1]"
+    if (-not $choice) { $choice = '1' }
+
+    switch ($choice) {
+        { $_ -in '1', 'fly' } {
+            $fly = Get-Command fly -ErrorAction SilentlyContinue
+            if (-not $fly) {
+                Write-Warn "fly CLI not found."
+                $ans = Read-Host "Install fly CLI via PowerShell? [y/N]"
+                if ($ans -match '^[Yy]') {
+                    Invoke-RestMethod https://fly.io/install.ps1 | Invoke-Expression
+                }
+                $fly = Get-Command fly -ErrorAction SilentlyContinue
+            }
+            if (-not $fly) { Write-Err "fly CLI required. Install: https://fly.io/docs/hands-on/install-flyctl/"; exit 1 }
+            Write-Info "Launching on Fly.io..."
+            $flyArgs = @('launch', '--config', "$DeployDir\fly.toml", '--image', 'docker.io/vanjayak/open-design:latest', '--now')
+            & fly $flyArgs
+            if ($LASTEXITCODE -ne 0) { Write-Err "fly launch failed. Try: fly deploy -c $DeployDir\fly.toml"; exit 1 }
+            Write-Success "Deployed to Fly.io."
+            Write-Info "Set secrets: fly secrets set OD_API_TOKEN=your-token"
+        }
+        { $_ -in '2', 'railway' } {
+            $rw = Get-Command railway -ErrorAction SilentlyContinue
+            if (-not $rw) {
+                Write-Warn "Railway CLI not found."
+                $ans = Read-Host "Install Railway CLI via npm? [y/N]"
+                if ($ans -match '^[Yy]') { npm install -g @railway/cli 2>$null }
+                $rw = Get-Command railway -ErrorAction SilentlyContinue
+            }
+            if (-not $rw) { Write-Err "Railway CLI required. Install: npm install -g @railway/cli"; exit 1 }
+            Write-Info "Deploying to Railway..."
+            & railway up
+            Write-Success "Deployed to Railway."
+            Write-Info "Set env vars: railway variables set OD_API_TOKEN=your-token"
+        }
+        { $_ -in '3', 'render' } {
+            Write-Info "Render uses deploy\render.yaml for configuration."
+            Write-Host ""
+            Write-Host "  1. Go to https://dashboard.render.com/new"
+            Write-Host "  2. Connect your GitHub repo"
+            Write-Host "  3. Render detects deploy\render.yaml automatically"
+            Write-Host ""
+            Write-Info "Config: $DeployDir\render.yaml"
+        }
+        { $_ -in '4', 'cloudrun', 'gcp' } {
+            $gcloud = Get-Command gcloud -ErrorAction SilentlyContinue
+            if (-not $gcloud) { Write-Err "gcloud CLI required. Install: https://cloud.google.com/sdk/docs/install"; exit 1 }
+            $region = Read-Host "Region [us-central1]"
+            if (-not $region) { $region = 'us-central1' }
+            Write-Info "Deploying to Google Cloud Run ($region)..."
+            & gcloud run deploy open-design --image="docker.io/vanjayak/open-design:latest" --region=$region --port=7456 --memory=512Mi --cpu=1 --min-instances=0 --max-instances=3 --allow-unauthenticated --set-env-vars="NODE_ENV=production,OD_BIND_HOST=0.0.0.0,OD_PORT=7456"
+            if ($LASTEXITCODE -ne 0) { Write-Err "gcloud run deploy failed."; exit 1 }
+            Write-Success "Deployed to Cloud Run."
+            Write-Info "Config reference: $DeployDir\cloud-run.yaml"
+        }
+        { $_ -in '5', 'apprunner', 'aws' } {
+            $aws = Get-Command aws -ErrorAction SilentlyContinue
+            if (-not $aws) { Write-Err "AWS CLI required. Install: https://docs.aws.amazon.com/cli/latest/userguide/install-cliv2.html"; exit 1 }
+            $region = Read-Host "Region [us-east-1]"
+            if (-not $region) { $region = 'us-east-1' }
+            Write-Info "Deploying to AWS App Runner ($region)..."
+            & aws apprunner create-service --service-name open-design --source-configuration "ImageRepository={ImageIdentifier=docker.io/vanjayak/open-design:latest,ImageRepositoryType=ECR_PUBLIC},AutoDeploymentsEnabled=false" --instance-configuration "Cpu=1 vCPU,Memory=512 MB" --port-configuration "Port=7456,Protocol=HTTP" --health-check-configuration "Protocol=HTTP,Path=/api/health,Interval=30,Timeout=5,HealthyThreshold=2,UnhealthyThreshold=3" --region $region
+            if ($LASTEXITCODE -ne 0) { Write-Err "AWS App Runner deploy failed."; Write-Info "Config: $DeployDir\app-runner.yaml"; exit 1 }
+            Write-Success "Deployed to AWS App Runner."
+        }
+        { $_ -in '6', 'koyeb' } {
+            $koyeb = Get-Command koyeb -ErrorAction SilentlyContinue
+            if (-not $koyeb) {
+                Write-Info "Koyeb CLI not found. Install: https://www.koyeb.com/docs/develop/cli"
+                Write-Host ""
+                Write-Host "  Dashboard deploy:"
+                Write-Host "  1. Go to https://app.koyeb.com/apps/create"
+                Write-Host "  2. Select 'Docker Image'"
+                Write-Host "  3. Enter: docker.io/vanjayak/open-design:latest"
+                Write-Host "  4. Expose port 7456 (HTTP)"
+                Write-Host "  5. Add env vars: NODE_ENV, OD_BIND_HOST, OD_PORT"
+                Write-Host "  6. Deploy"
+                Write-Info "Reference: $DeployDir\koyeb.yaml"
+            } else {
+                Write-Info "Deploying to Koyeb..."
+                & koyeb apps create open-design 2>$null; $null = $?
+                & koyeb services create open-design --app open-design --docker docker.io/vanjayak/open-design:latest --ports 7456:http --env "NODE_ENV=production" --env "OD_BIND_HOST=0.0.0.0" --env "OD_PORT=7456"
+                Write-Success "Deployed to Koyeb."
+            }
+        }
+        default { Write-Err "Invalid choice: $choice"; exit 1 }
+    }
+
+    Write-Host ""
+    Write-Host "  -- Cloud Deployment Initiated --" -ForegroundColor Green
+    Write-Host ""
+    Write-Host "  Config files in deploy\:"
+    Write-Host "    fly.toml         Fly.io"
+    Write-Host "    railway.toml     Railway"
+    Write-Host "    render.yaml      Render"
+    Write-Host "    cloud-run.yaml   Google Cloud Run"
+    Write-Host "    app-runner.yaml  AWS App Runner"
+    Write-Host "    koyeb.yaml       Koyeb"
+    Write-Host ""
+    exit 0
 }
 
 # =========================================================================
