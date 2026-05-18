@@ -517,7 +517,7 @@ function requireString(v: unknown, name: string): asserts v is string {
   }
 }
 
-async function handleMcpToolCall(baseUrl: string, name: unknown, args: McpArgs) {
+export async function handleMcpToolCall(baseUrl: string, name: unknown, args: McpArgs) {
   try {
     switch (name) {
       case 'list_projects':
