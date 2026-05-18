@@ -242,7 +242,7 @@ if (argv[0] === 'tools' && argv[1] === 'live-artifacts') {
 // Default: daemon mode.
 
 // First-run detection: if onboarding not completed, launch setup wizard.
-const projectRoot = resolveProjectRoot();
+const projectRoot = resolveProjectRoot(path.dirname(fileURLToPath(import.meta.url)));
 const dataDir = resolveDataDir(projectRoot);
 const { readAppConfig } = await import('./app-config.js');
 const appConfig = await readAppConfig(dataDir);
@@ -4862,7 +4862,7 @@ async function runSetup(args) {
     : flags.mode === 'quick' ? 'quick'
     : undefined;
 
-  const projectRoot = resolveProjectRoot();
+  const projectRoot = resolveProjectRoot(path.dirname(fileURLToPath(import.meta.url)));
   const dataDir = resolveDataDir(projectRoot);
 
   const { runWizard } = await import('./setup/wizard.js');

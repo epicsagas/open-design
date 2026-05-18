@@ -11,6 +11,7 @@ import { runMedia } from './steps/media.js';
 import { runMcp } from './steps/mcp.js';
 import { runMemory } from './steps/memory.js';
 import { runDesignSystem } from './steps/design-system.js';
+import { findAvailablePort } from './port-scan.js';
 
 export interface WizardContext {
   prompter: SetupPrompter;
@@ -18,6 +19,7 @@ export interface WizardContext {
   projectRoot: string;
   selectedAgents: string[];
   flags: Record<string, unknown>;
+  resolvedPort?: number;
 }
 
 export type WizardMode = 'quick' | 'advanced';
@@ -55,8 +57,8 @@ export async function runWizard(ctx: WizardContext, mode?: WizardMode): Promise<
     // Step 5: Design System + Skills
     await runDesignSystem(ctx);
 
-    // Step 6: Network
-    await runNetwork(ctx);
+    // Step 6: Network (prompts user for host/port)
+    ctx.resolvedPort = await runNetwork(ctx);
 
     // Step 7: Media Providers
     await runMedia(ctx);
@@ -70,6 +72,16 @@ export async function runWizard(ctx: WizardContext, mode?: WizardMode): Promise<
     // Steps 10-16: remaining advanced settings are deferred to Settings UI
     // (Connectors, Orbit, Language, Appearance, Desktop, Notifications, Integrations)
     ctx.prompter.info('Additional settings (Connectors, Orbit, Language, Appearance, Notifications) are available in Settings →');
+  } else {
+    // Quick mode: auto-detect available port and save
+    ctx.resolvedPort = await ctx.prompter.spinner('Scanning for available port...', () =>
+      findAvailablePort(),
+    );
+    if (ctx.resolvedPort !== 7456) {
+      ctx.prompter.info(`Port 7456 is in use — using port ${ctx.resolvedPort}.`);
+    }
+    const { writeAppConfig } = await import('../app-config.js');
+    await writeAppConfig(ctx.dataDir, { port: ctx.resolvedPort });
   }
 
   // Step 5 (Quick) / Step 17 (Advanced): Telemetry

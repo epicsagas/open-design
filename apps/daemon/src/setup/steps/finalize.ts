@@ -31,11 +31,10 @@ async function startAndOpen(ctx: WizardContext): Promise<void> {
     const { startServer } = await import('../../server.js');
     const { openBrowser } = await import('../../browser-open.js');
 
-    const port = typeof ctx.flags['port'] === 'string' ? parseInt(ctx.flags['port'], 10) : 7456;
+    const port = ctx.resolvedPort ?? (typeof ctx.flags['port'] === 'string' ? parseInt(ctx.flags['port'], 10) : 7456);
     const host = typeof ctx.flags['bind'] === 'string' ? ctx.flags['bind'] : '127.0.0.1';
 
-    const started = await startServer({ port, host, returnServer: false }) as unknown as { url: string };
-    const url = started.url;
+    const url = await startServer({ port, host, returnServer: false }) as unknown as string;
 
     // Health check
     const resp = await fetch(`${url}/api/health`);
@@ -62,7 +61,7 @@ function printSummary(ctx: WizardContext, url: string | null): void {
     'Setup Complete',
     [
       `  Agent:      ${primaryAgent}`,
-      `  Port:       ${typeof ctx.flags['port'] === 'string' ? ctx.flags['port'] : '7456'}`,
+      `  Port:       ${ctx.resolvedPort ?? (typeof ctx.flags['port'] === 'string' ? ctx.flags['port'] : '7456')}`,
       `  Data:       ${ctx.dataDir}`,
       '',
       url ? `  → ${url}` : '  Start with: od',

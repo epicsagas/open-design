@@ -3,7 +3,11 @@ import type { SetupPrompter, SelectOption } from './prompts.js';
 
 export class ClackPrompter implements SetupPrompter {
   text(message: string, defaultValue?: string): Promise<string> {
-    return clack.text({ message, defaultValue: defaultValue ?? '' }) as Promise<string>;
+    return clack.text({
+      message,
+      placeholder: defaultValue ?? '',
+      defaultValue: defaultValue ?? '',
+    }) as Promise<string>;
   }
 
   async select<T>(message: string, options: SelectOption<T>[], initialValue?: T): Promise<T> {
