@@ -194,6 +194,7 @@ const SUBCOMMAND_MAP = {
   version: runVersion,
   doctor: runDoctor,
   config: runConfig,
+  setup: runSetup,
 };
 
 if (argv[0] === 'mcp' && argv[1] === 'live-artifacts') {
@@ -237,6 +238,21 @@ if (argv[0] === 'tools' && argv[1] === 'live-artifacts') {
     });
 } else {
 // Default: daemon mode.
+
+// First-run detection: if onboarding not completed, launch setup wizard.
+const projectRoot = resolveProjectRoot();
+const dataDir = resolveDataDir(projectRoot);
+const { readAppConfig } = await import('./app-config.js');
+const appConfig = await readAppConfig(dataDir);
+if (!appConfig.onboardingCompleted) {
+  console.log('[od] First run detected — launching setup wizard.\n');
+  const { ClackPrompter } = await import('./setup/clack-prompter.js');
+  const prompter = new ClackPrompter();
+  await runSetupWizard({ prompter, dataDir, projectRoot, selectedAgents: [], flags: {} });
+  // runSetupWizard finalizes by starting the daemon or exiting
+  return;
+}
+
 let port: number | undefined = process.env.OD_PORT ? Number(process.env.OD_PORT) : undefined;
 let host: string | undefined = process.env.OD_BIND_HOST;
 let open = true;
@@ -303,6 +319,9 @@ function printRootHelp() {
   console.log(`Usage:
   od [--port <n>] [--host <addr>] [--no-open]
       Start the local daemon and open the web UI.
+
+  od setup [--mode <quick|advanced>] [--non-interactive --accept-risk]
+      Interactive setup wizard. Runs automatically on first launch.
 
   od tools live-artifacts <create|list|update|refresh> [options]
       Manage live artifacts through daemon wrapper commands.
@@ -4812,4 +4831,88 @@ Common options:
       console.error(`unknown subcommand: od config ${sub}`);
       process.exit(2);
   }
+}
+
+// ---------------------------------------------------------------------------
+// Subcommand: od setup
+// ---------------------------------------------------------------------------
+
+async function runSetup(args) {
+  if (args.includes('--help') || args.includes('-h')) {
+    printSetupHelp();
+    process.exit(0);
+  }
+
+  const flags = parseFlags(args, {
+    string: new Set(['mode', 'port', 'bind']),
+    boolean: new Set(['non-interactive', 'accept-risk']),
+  });
+
+  const nonInteractive = flags['non-interactive'] === true;
+  const acceptRisk = flags['accept-risk'] === true;
+
+  if (nonInteractive && !acceptRisk) {
+    console.error(
+      'Error: --non-interactive requires --accept-risk to acknowledge that ' +
+      'defaults will be used without prompts.',
+    );
+    process.exit(2);
+  }
+
+  const mode = flags.mode === 'advanced' ? 'advanced'
+    : flags.mode === 'quick' ? 'quick'
+    : undefined;
+
+  const projectRoot = resolveProjectRoot();
+  const dataDir = resolveDataDir(projectRoot);
+
+  const { runWizard } = await import('./setup/wizard.js');
+
+  if (nonInteractive) {
+    const { SilentPrompter } = await import('./setup/silent-prompter.js');
+    const prompter = new SilentPrompter(flags);
+    await runWizard(
+      { prompter, dataDir, projectRoot, selectedAgents: [], flags },
+      mode ?? 'quick',
+    );
+  } else {
+    const { ClackPrompter } = await import('./setup/clack-prompter.js');
+    const prompter = new ClackPrompter();
+    await runWizard(
+      { prompter, dataDir, projectRoot, selectedAgents: [], flags },
+      mode,
+    );
+  }
+}
+
+function printSetupHelp() {
+  console.log(`Usage: od setup [options]
+
+Interactive setup wizard for Open Design.
+
+Options:
+  --mode <quick|advanced>  Choose setup mode (default: interactive prompt)
+  --non-interactive       Run without prompts (requires --accept-risk)
+  --accept-risk           Acknowledge default values in non-interactive mode
+  --port <n>              Port to listen on (default: 7456)
+  --bind <addr>           Interface address (default: 127.0.0.1)
+  --help, -h              Show this help
+
+Modes:
+  quick       5 steps — agent, API key, plugin, telemetry, finalize
+  advanced    17 steps — full control over all settings
+
+First run:
+  Running 'od' for the first time (no onboardingCompleted flag) will
+  automatically launch this wizard. Subsequent runs start the daemon directly.
+
+Examples:
+  od setup                    # Interactive wizard
+  od setup --mode advanced    # Advanced mode
+  od setup --non-interactive --accept-risk  # CI / headless`);
+}
+
+async function runSetupWizard(ctx) {
+  const { runWizard } = await import('./setup/wizard.js');
+  await runWizard(ctx);
 }
