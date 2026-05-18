@@ -405,8 +405,20 @@ if [ "$OS" = "Linux" ] && [ -f "${HOME}/.config/systemd/user/open-design.service
 fi
 printf "\n"
 printf "  Next steps:\n"
-printf "    Open http://127.0.0.1:%s in your browser\n" "$PORT"
-printf "    Update:  %s/update.sh\n" "$SCRIPT_DIR"
-printf "    Uninstall:  %s/uninstall.sh\n" "$SCRIPT_DIR"
-printf "    Logs:    docker compose -f %s logs -f\n" "$COMPOSE_FILE"
+printf "    Update:    %s/update.sh\n" "$SCRIPT_DIR"
+printf "    Uninstall: %s/uninstall.sh\n" "$SCRIPT_DIR"
+printf "    Logs:      docker compose -f %s logs -f\n" "$COMPOSE_FILE"
 printf "\n"
+
+# ---------------------------------------------------------------------------
+# 10. Launch setup wizard
+# ---------------------------------------------------------------------------
+if [ "${NON_INTERACTIVE:-0}" = "0" ] && command -v od >/dev/null 2>&1; then
+  printf "${BOLD}[open-design]${RESET} Launching setup wizard...\n\n"
+  OD_PORT="$PORT" od setup
+elif [ "${NON_INTERACTIVE:-0}" = "0" ]; then
+  printf "[open-design] Run 'od setup' to configure API keys, agents, and MCP servers.\n"
+  printf "    Open http://127.0.0.1:%s in your browser\n\n" "$PORT"
+else
+  printf "    Open http://127.0.0.1:%s in your browser\n\n" "$PORT"
+fi

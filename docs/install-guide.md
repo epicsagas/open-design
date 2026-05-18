@@ -77,7 +77,7 @@ After you confirm, the installer:
 3. Runs `docker compose up -d --no-build` to start the container.
 4. Polls `/api/health` for up to 60 seconds to confirm the daemon is ready.
 5. On Linux: installs a `systemd --user` unit so the service starts on login.
-6. Prints the URL and next steps.
+6. Launches `od setup` to configure API keys, agents, and MCP servers.
 
 ## Non-interactive install
 

@@ -204,8 +204,25 @@ Write-Host "  Data vol:  open_design_data"
 Write-Host "  Config:    $EnvFile"
 Write-Host ""
 Write-Host "  Next steps:"
-Write-Host "    Open http://127.0.0.1:$Port in your browser"
 Write-Host "    Update:    $ScriptDir\update.ps1"
 Write-Host "    Uninstall: $ScriptDir\uninstall.ps1"
 Write-Host "    Logs:      docker compose -f $ComposeFile logs -f"
 Write-Host ""
+
+# ---------------------------------------------------------------------------
+# 8. Launch setup wizard
+# ---------------------------------------------------------------------------
+$odCmd = Get-Command od -ErrorAction SilentlyContinue
+if (-not $NonInteractive -and $odCmd) {
+    Write-Info "Launching setup wizard..."
+    Write-Host ""
+    $env:OD_PORT = "$Port"
+    & od setup
+} elseif (-not $NonInteractive) {
+    Write-Info "Run 'od setup' to configure API keys, agents, and MCP servers."
+    Write-Host "    Open http://127.0.0.1:$Port in your browser"
+    Write-Host ""
+} else {
+    Write-Host "    Open http://127.0.0.1:$Port in your browser"
+    Write-Host ""
+}
