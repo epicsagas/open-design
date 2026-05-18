@@ -4,7 +4,7 @@
 #
 # Usage:
 #   curl -fsSL https://raw.githubusercontent.com/nexu-io/open-design/main/deploy/scripts/install.sh | sh
-#   ./install.sh [--mode docker|node] [--non-interactive] [--port 7456] [--no-systemd]
+#   ./install.sh [--mode docker|node|cloud] [--non-interactive] [--port 7456] [--no-systemd]
 set -eu
 
 # ---------------------------------------------------------------------------
@@ -95,7 +95,7 @@ for arg in "$@"; do
       echo "Usage: install.sh [options]"
       echo ""
       echo "Options:"
-      echo "  --mode <docker|node>    Installation mode (default: prompt if Docker, else node)"
+      echo "  --mode <docker|node|cloud>  Installation mode (default: prompt if Docker, else node)"
       echo "  --non-interactive       Use defaults for all prompts"
       echo "  --port <n>              Host port (default: ${DEFAULT_PORT})"
       echo "  --image <ref>           Docker image reference (Docker mode only)"
@@ -106,6 +106,7 @@ for arg in "$@"; do
       echo "Modes:"
       echo "  docker    Install via Docker Compose (requires Docker)"
       echo "  node      Install via Node.js (clone repo, build, run directly)"
+      echo "  cloud     Deploy to a cloud platform (Fly.io, Railway, Render, GCP Cloud Run, AWS App Runner, Koyeb)"
       echo ""
       echo "When --mode is not specified:"
       echo "  - Docker detected: asks which mode to use"
@@ -182,8 +183,8 @@ else
   fi
 fi
 
-if [ "$INSTALL_MODE" != "docker" ] && [ "$INSTALL_MODE" != "node" ]; then
-  error "Unknown mode: ${INSTALL_MODE}. Use 'docker' or 'node'."
+if [ "$INSTALL_MODE" != "docker" ] && [ "$INSTALL_MODE" != "node" ] && [ "$INSTALL_MODE" != "cloud" ]; then
+  error "Unknown mode: ${INSTALL_MODE}. Use 'docker', 'node', or 'cloud'."
   exit 1
 fi
 
@@ -213,6 +214,196 @@ if [ "$PORT" != "$DEFAULT_PORT" ] || [ "$NON_INTERACTIVE" = "0" ]; then
     fi
   fi
 fi
+
+# =========================================================================
+# CLOUD MODE
+# =========================================================================
+if [ "$INSTALL_MODE" = "cloud" ]; then
+
+CLOUD_PLATFORM=""
+CLOUD_PLATFORMS="fly railway render cloudrun apprunner koyeb"
+
+cloud_deploy_fly() {
+  if ! command -v fly >/dev/null 2>&1; then
+    warn "fly CLI not found."
+    if prompt_confirm "Install fly CLI now?" 0; then
+      curl -L https://fly.io/install.sh | sh 2>/dev/null
+      export PATH="${HOME}/.fly/bin:${PATH}"
+    fi
+    if ! command -v fly >/dev/null 2>&1; then
+      error "fly CLI required. Install: https://fly.io/docs/hands-on/install-flyctl/"
+      return 1
+    fi
+  fi
+
+  info "Launching on Fly.io..."
+  fly launch --config "${DEPLOY_DIR}/fly.toml" --image "docker.io/vanjayak/open-design:latest" ${NON_INTERACTIVE_ZERO:-} --now 2>&1 || {
+    error "fly launch failed. Check deploy/fly.toml and try: fly deploy"
+    return 1
+  }
+  success "Deployed to Fly.io."
+  info "Set secrets: fly secrets set OD_API_TOKEN=your-token OD_ALLOWED_ORIGINS=https://your-domain.com"
+  info "Dashboard: https://fly.io/apps/open-design"
+}
+
+cloud_deploy_railway() {
+  if ! command -v railway >/dev/null 2>&1; then
+    warn "Railway CLI not found."
+    if prompt_confirm "Install Railway CLI now?" 0; then
+      npm install -g @railway/cli 2>/dev/null || true
+    fi
+    if ! command -v railway >/dev/null 2>&1; then
+      error "Railway CLI required. Install: npm install -g @railway/cli"
+      return 1
+    fi
+  fi
+
+  info "Deploying to Railway..."
+  railway up 2>&1 || {
+    info "If this is a new project, run: railway init"
+    info "Then: railway up"
+    return 1
+  }
+  success "Deployed to Railway."
+  info "Set env vars: railway variables set OD_API_TOKEN=your-token OD_ALLOWED_ORIGINS=https://your-domain.com"
+}
+
+cloud_deploy_render() {
+  info "Render uses deploy/render.yaml for configuration."
+  info ""
+  info "Option 1 — Dashboard:"
+  info "  1. Go to https://dashboard.render.com/new"
+  info "  2. Connect your GitHub repo"
+  info "  3. Render detects deploy/render.yaml automatically"
+  info ""
+  info "Option 2 — Blueprint API:"
+  RENDER_OWNER="nexu-io" RENDER_REPO="open-design"
+  info "  curl -H 'Authorization: Bearer <YOUR_RENDER_API_KEY>' \\"
+  info "       -d '{\"repo\":\"https://github.com/${RENDER_OWNER}/${RENDER_REPO}\"}' \\"
+  info "       https://api.render.com/v1/services?envGroup=blueprint"
+  info ""
+  info "Config: ${DEPLOY_DIR}/render.yaml"
+}
+
+cloud_deploy_cloudrun() {
+  if ! command -v gcloud >/dev/null 2>&1; then
+    error "gcloud CLI required. Install: https://cloud.google.com/sdk/docs/install"
+    return 1
+  fi
+
+  _region="${CLOUD_REGION:-us-central1}"
+  info "Deploying to Google Cloud Run (${_region})..."
+
+  gcloud run deploy open-design \
+    --image="docker.io/vanjayak/open-design:latest" \
+    --region="$_region" \
+    --port=7456 \
+    --memory=512Mi \
+    --cpu=1 \
+    --min-instances=0 \
+    --max-instances=3 \
+    --allow-unauthenticated \
+    --set-env-vars="NODE_ENV=production,OD_BIND_HOST=0.0.0.0,OD_PORT=7456" \
+    ${NON_INTERACTIVE_ZERO:-} 2>&1 || {
+    error "gcloud run deploy failed."
+    return 1
+  }
+  success "Deployed to Cloud Run."
+  info "Set secrets: gcloud run services update open-design --update-secrets=OD_API_TOKEN=open-design-secrets:latest"
+  info "Config reference: ${DEPLOY_DIR}/cloud-run.yaml"
+}
+
+cloud_deploy_apprunner() {
+  if ! command -v aws >/dev/null 2>&1; then
+    error "AWS CLI required. Install: https://docs.aws.amazon.com/cli/latest/userguide/install-cliv2.html"
+    return 1
+  fi
+
+  _region="${CLOUD_REGION:-us-east-1}"
+  info "Deploying to AWS App Runner (${_region})..."
+
+  aws apprunner create-service \
+    --service-name open-design \
+    --source-configuration "ImageRepository={ImageIdentifier=docker.io/vanjayak/open-design:latest,ImageRepositoryType=ECR_PUBLIC},AutoDeploymentsEnabled=false" \
+    --instance-configuration "Cpu=1 vCPU,Memory=512 MB" \
+    --port-configuration "Port=7456,Protocol=HTTP" \
+    --health-check-configuration "Protocol=HTTP,Path=/api/health,Interval=30,Timeout=5,HealthyThreshold=2,UnhealthyThreshold=3" \
+    --region="$_region" 2>&1 || {
+    error "AWS App Runner deploy failed."
+    info "Config reference: ${DEPLOY_DIR}/app-runner.yaml"
+    return 1
+  }
+  success "Deployed to AWS App Runner."
+}
+
+cloud_deploy_koyeb() {
+  if ! command -v koyeb >/dev/null 2>&1; then
+    warn "Koyeb CLI not found."
+    info "Install: https://www.koyeb.com/docs/develop/cli"
+    info ""
+    info "Dashboard deploy:"
+    info "  1. Go to https://app.koyeb.com/apps/create"
+    info "  2. Select 'Docker Image'"
+    info "  3. Enter: docker.io/vanjayak/open-design:latest"
+    info "  4. Set port 7456, add env vars"
+    info "  5. Deploy"
+    return 0
+  fi
+
+  info "Deploying to Koyeb..."
+  koyeb service create open-design --docker docker.io/vanjayak/open-design:latest --port 7456 2>&1 || {
+    error "Koyeb deploy failed."
+    return 1
+  }
+  success "Deployed to Koyeb."
+}
+
+# --- Platform selection ---
+printf "\n"
+info "Cloud deployment platforms:"
+printf "  1) Fly.io          — Global edge, persistent volumes\n"
+printf "  2) Railway         — Git-based, zero config\n"
+printf "  3) Render          — Blueprint from render.yaml\n"
+printf "  4) Google Cloud Run— Serverless containers\n"
+printf "  5) AWS App Runner  — Managed container service\n"
+printf "  6) Koyeb           — Global edge deployment\n"
+printf "\n"
+
+if [ "$NON_INTERACTIVE" = "1" ]; then
+  error "Cloud mode requires interactive platform selection."
+  info "Or use platform CLIs directly with config files in deploy/:"
+  info "  fly deploy -c deploy/fly.toml"
+  info "  railway up"
+  info "  gcloud run deploy --config deploy/cloud-run.yaml"
+  exit 1
+fi
+
+prompt_text "Choose platform (1-6)" "1"
+_platform_choice="$_val"
+case "$_platform_choice" in
+  1|fly)    cloud_deploy_fly ;;
+  2|railway) cloud_deploy_railway ;;
+  3|render)  cloud_deploy_render ;;
+  4|cloudrun|gcp) cloud_deploy_cloudrun ;;
+  5|apprunner|aws) cloud_deploy_apprunner ;;
+  6|koyeb)   cloud_deploy_koyeb ;;
+  *) error "Invalid choice: $_platform_choice"; exit 1 ;;
+esac
+
+printf "\n"
+printf "${BOLD}${GREEN}  -- Cloud Deployment Initiated --${RESET}\n"
+printf "\n"
+printf "  Config files in deploy/:\n"
+printf "    fly.toml         Fly.io\n"
+printf "    railway.toml     Railway\n"
+printf "    render.yaml      Render\n"
+printf "    cloud-run.yaml   Google Cloud Run\n"
+printf "    app-runner.yaml  AWS App Runner\n"
+printf "    koyeb.yaml       Koyeb\n"
+printf "\n"
+
+exit 0
+fi # end cloud mode
 
 # =========================================================================
 # DOCKER MODE

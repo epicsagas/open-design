@@ -1,0 +1,24 @@
+version: 1.0
+runtime: docker
+build:
+  dockerfile: deploy/Dockerfile
+  context: .
+run:
+  image: docker.io/vanjayak/open-design:latest
+  env:
+    - name: NODE_ENV
+      value: production
+    - name: OD_BIND_HOST
+      value: "0.0.0.0"
+    - name: OD_PORT
+      value: "7456"
+  network:
+    port: 7456
+    protocol: HTTP
+  healthCheck:
+    protocol: HTTP
+    path: /api/health
+    interval: 30
+    timeout: 5
+    healthyThreshold: 2
+    unhealthyThreshold: 3

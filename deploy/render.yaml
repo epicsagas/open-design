@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: open-design
+    runtime: docker
+    image:
+      url: docker.io/vanjayak/open-design:latest
+    plan: starter
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: OD_BIND_HOST
+        value: 0.0.0.0
+      - key: OD_PORT
+        value: 7456
+      - key: OD_ALLOWED_ORIGINS
+        sync: false
+      - key: OD_API_TOKEN
+        sync: false
+    healthCheckPath: /api/health
+    disk:
+      name: open-design-data
+      mountPath: /app/.od
+      sizeGB: 1

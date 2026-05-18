@@ -1,0 +1,35 @@
+[build]
+  image = "docker.io/vanjayak/open-design:latest"
+
+[deploy]
+  healthcheckPath = "/api/health"
+  healthcheckTimeout = 300
+  restartPolicyType = "on_failure"
+  restartPolicyMaxRetries = 3
+
+[[services.env]]
+  name = "NODE_ENV"
+  value = "production"
+
+[[services.env]]
+  name = "OD_BIND_HOST"
+  value = "0.0.0.0"
+
+[[services.env]]
+  name = "OD_PORT"
+  value = "7456"
+
+[[services.env]]
+  name = "OD_ALLOWED_ORIGINS"
+
+[[services.env]]
+  name = "OD_API_TOKEN"
+
+[[services.variables]]
+  name = "OD_DATA_DIR"
+  value = "/data/od"
+
+[[volumes]]
+  name = "open-design-data"
+  mountPath = "/data/od"
+  size = "1GB"

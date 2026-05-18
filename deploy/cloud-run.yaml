@@ -1,0 +1,51 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: open-design
+  annotations:
+    run.googleapis.com/ingress: all
+spec:
+  template:
+    metadata:
+      annotations:
+        run.googleapis.com/memory: "512Mi"
+        run.googleapis.com/cpu: "1"
+        run.googleapis.com/max-scale: "3"
+        run.googleapis.com/min-scale: "0"
+    spec:
+      containerConcurrency: 80
+      containers:
+        - image: docker.io/vanjayak/open-design:latest
+          ports:
+            - containerPort: 7456
+          env:
+            - name: NODE_ENV
+              value: production
+            - name: OD_BIND_HOST
+              value: "0.0.0.0"
+            - name: OD_PORT
+              value: "7456"
+            - name: OD_ALLOWED_ORIGINS
+              value: ""
+            - name: OD_API_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: open-design-secrets
+                  key: api-token
+          resources:
+            limits:
+              memory: "512Mi"
+              cpu: "1"
+          startupProbe:
+            httpGet:
+              path: /api/health
+              port: 7456
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            failureThreshold: 12
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: 7456
+            periodSeconds: 30
+            timeoutSeconds: 5

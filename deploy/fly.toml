@@ -1,0 +1,41 @@
+app = "open-design"
+primary_region = "sjc"
+
+[build]
+  image = "docker.io/vanjayak/open-design:latest"
+
+[env]
+  NODE_ENV = "production"
+  OD_BIND_HOST = "0.0.0.0"
+  OD_PORT = "7456"
+
+[http_service]
+  internal_port = 7456
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+
+[http_service.concurrency]
+  type = "requests"
+  soft_limit = 50
+  hard_limit = 100
+
+[[vm]]
+  memory = "384mb"
+  cpu_kind = "shared"
+  cpus = 1
+
+[mounts]
+  source = "open_design_data"
+  destination = "/app/.od"
+  initial_size = "1gb"
+
+[checks]
+  [checks.health]
+    grace_period = "20s"
+    interval = "30s"
+    method = "get"
+    path = "/api/health"
+    port = 7456
+    timeout = "5s"
