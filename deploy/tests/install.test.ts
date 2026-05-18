@@ -45,12 +45,19 @@ test('install.sh --help exits 0', async () => {
   assert.match(stdout, /Usage/);
   assert.match(stdout, /--non-interactive/);
   assert.match(stdout, /--port/);
+  assert.match(stdout, /--mode/);
+});
+
+test('install.sh --help describes docker and node modes', async () => {
+  const { stdout } = await execFileAsync('bash', [installScript, '--help']);
+  assert.match(stdout, /docker/);
+  assert.match(stdout, /node/);
 });
 
 test('uninstall.sh --help exits 0', async () => {
   const { stdout } = await execFileAsync('bash', [uninstallScript, '--help']);
   assert.match(stdout, /Usage/);
-  assert.match(stdout, /--keep-data/);
+  assert.match(stdout, /--delete-data/);
 });
 
 test('update.sh --help exits 0', async () => {
@@ -62,7 +69,7 @@ test('update.sh --help exits 0', async () => {
 // ---------------------------------------------------------------------------
 // Docker integration tests — skipped when Docker is unavailable
 // ---------------------------------------------------------------------------
-test('install.sh --non-interactive creates .env and starts container', { skip: !dockerAvailable ? 'Docker not available' : false }, async () => {
+test('install.sh --non-interactive --mode=docker creates .env with INSTALL_MODE=docker', { skip: !dockerAvailable ? 'Docker not available' : false }, async () => {
   let tmpDir = '';
   try {
     tmpDir = await mkdtemp(join(tmpdir(), 'od-install-test-'));
@@ -71,15 +78,17 @@ test('install.sh --non-interactive creates .env and starts container', { skip: !
     await execFileAsync('cp', ['-r', join(repoRoot, 'deploy/.'), tmpDir]);
 
     const script = join(tmpDir, 'scripts/install.sh');
-    const { stdout, stderr } = await execFileAsync('bash', [
+    await execFileAsync('bash', [
       script,
       '--non-interactive',
+      '--mode=docker',
       `--port=${TEST_PORT}`,
       '--no-systemd',
     ], { timeout: 120_000 });
 
-    // .env should be generated
+    // .env should be generated with mode=docker
     const envContent = await readFile(join(tmpDir, '.env'), 'utf8');
+    assert.match(envContent, /OPEN_DESIGN_INSTALL_MODE=docker/);
     assert.match(envContent, new RegExp(`OPEN_DESIGN_PORT=${TEST_PORT}`));
 
     // Container should be healthy
