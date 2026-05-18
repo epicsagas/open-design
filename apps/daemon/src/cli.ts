@@ -1,14 +1,11 @@
 #!/usr/bin/env node
 // @ts-nocheck
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { startServer, resolveProjectRoot, resolveDataDir } from './server.js';
+import { runDaemonCliStartup } from './daemon-startup.js';
 import { generateKey, listKeys, revokeKey } from './auth-store.js';
 import { runLiveArtifactsMcpServer } from './mcp-live-artifacts-server.js';
 import { runConnectorsToolCli } from './tools-connectors-cli.js';
 import { runLiveArtifactsToolCli } from './tools-live-artifacts-cli.js';
 import { splitResearchSubcommand } from './research/cli-args.js';
-import { openBrowser } from './browser-open.js';
 import { resolveDaemonUrl } from './daemon-url.js';
 
 const argv = process.argv.slice(2);
@@ -236,67 +233,7 @@ if (argv[0] === 'tools' && argv[1] === 'live-artifacts') {
       process.exitCode = 1;
     });
 } else {
-// Default: daemon mode.
-let port: number | undefined = process.env.OD_PORT ? Number(process.env.OD_PORT) : undefined;
-let host: string | undefined = process.env.OD_BIND_HOST;
-let open = true;
-
-for (let i = 0; i < argv.length; i++) {
-  const a = argv[i];
-  if (a === '-p' || a === '--port') {
-    port = Number(argv[++i]);
-  } else if (a === '--host') {
-    host = argv[++i];
-  } else if (a === '--no-open') {
-    open = false;
-  } else if (a === '-h' || a === '--help') {
-    printRootHelp();
-    process.exit(0);
-  }
-}
-
-startServer({ port, host, returnServer: true }).then((started) => {
-  const { url, server, shutdown } = started;
-  const closeTimeoutMs = 5_000;
-  const closeServer = () => new Promise((resolve) => {
-    let resolved = false;
-    const resolveOnce = () => {
-      if (resolved) return;
-      resolved = true;
-      resolve();
-    };
-    const idleTimer = setTimeout(() => {
-      server.closeIdleConnections?.();
-    }, Math.min(1_000, closeTimeoutMs));
-    const hardTimer = setTimeout(() => {
-      server.closeAllConnections?.();
-      resolveOnce();
-    }, closeTimeoutMs);
-    idleTimer.unref?.();
-    hardTimer.unref?.();
-    server.close(() => resolveOnce());
-  }).finally(() => {
-    server.closeIdleConnections?.();
-  });
-  let shuttingDown = false;
-  const stop = () => {
-    if (shuttingDown) {
-      process.exit(0);
-    }
-    shuttingDown = true;
-    const closePromise = closeServer();
-    const shutdownPromise = Promise.resolve().then(() => shutdown?.());
-    void Promise.resolve()
-      .then(() => Promise.allSettled([shutdownPromise, closePromise]))
-      .finally(() => process.exit(0));
-  };
-  process.on('SIGINT', stop);
-  process.on('SIGTERM', stop);
-  console.log(`[od] listening on ${url}`);
-  if (open) {
-    openBrowser(url);
-  }
-});
+  await runDaemonCliStartup(argv, { printHelp: printRootHelp });
 }
 
 function printRootHelp() {
@@ -3092,9 +3029,25 @@ publish from a frozen run snapshot rather than the live installed copy.`);
     const resp = await fetch(`${base}/api/plugins/${encodeURIComponent(id)}`);
     if (resp.ok) {
       const row = await resp.json();
+      // The daemon's plugin row carries a stored `version` plus the full
+      // manifest. For project-local plugins (`generated-plugin/`, snapshots,
+      // freshly imported folders) the stored `version` is `'0.0.0'` until
+      // the registry handshake runs, but the manifest's `version` is the
+      // real value the author wrote. Mirror `plugins/marketplaces.ts:298,328`
+      // and prefer the manifest version when the stored row reads as the
+      // pre-handshake sentinel. Closes #1765.
+      const storedVersion = typeof row.version === 'string' && row.version.length > 0
+        ? row.version
+        : null;
+      const manifestVersion = typeof row.manifest?.version === 'string' && row.manifest.version.length > 0
+        ? row.manifest.version
+        : null;
+      const resolvedVersion = (storedVersion && storedVersion !== '0.0.0')
+        ? storedVersion
+        : (manifestVersion ?? storedVersion ?? '0.0.0');
       meta = {
         pluginId:          row.id ?? id,
-        pluginVersion:     row.version ?? '0.0.0',
+        pluginVersion:     resolvedVersion,
         ...(row.title              ? { pluginTitle: row.title }                       : {}),
         ...(row.manifest?.description ? { pluginDescription: row.manifest.description } : {}),
       };
