@@ -143,6 +143,8 @@ const DAEMON_STRING_FLAGS = new Set([
 const DAEMON_BOOLEAN_FLAGS = new Set([
   'help', 'h', 'json', 'headless', 'serve-web', 'no-open',
 ]);
+const CONFIG_STRING_FLAGS = new Set(['daemon-url', 'value', 'value-json']);
+const CONFIG_BOOLEAN_FLAGS = new Set(['help', 'h', 'json']);
 const LIBRARY_STRING_FLAGS = new Set(['daemon-url', 'query', 'tag']);
 const LIBRARY_BOOLEAN_FLAGS = new Set(['help', 'h', 'json']);
 const PROJECT_STRING_FLAGS = new Set([
@@ -250,7 +252,7 @@ if (!appConfig.onboardingCompleted) {
   const prompter = new ClackPrompter();
   await runSetupWizard({ prompter, dataDir, projectRoot, selectedAgents: [], flags: {} });
   // runSetupWizard finalizes by starting the daemon or exiting
-  return;
+  process.exit(0);
 }
 
 let port: number | undefined = process.env.OD_PORT ? Number(process.env.OD_PORT) : undefined;
@@ -4607,9 +4609,6 @@ async function runVersion(args) {
 // without leaving the terminal. JSON values pass through unchanged;
 // scalar strings/numbers/booleans are coerced.
 // ---------------------------------------------------------------------------
-
-const CONFIG_STRING_FLAGS = new Set(['daemon-url', 'value', 'value-json']);
-const CONFIG_BOOLEAN_FLAGS = new Set(['help', 'h', 'json']);
 
 async function runDoctor(args) {
   const flags = parseFlags(args, { string: CONFIG_STRING_FLAGS, boolean: CONFIG_BOOLEAN_FLAGS });
