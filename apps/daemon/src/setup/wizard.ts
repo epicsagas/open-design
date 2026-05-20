@@ -73,14 +73,16 @@ export async function runWizard(ctx: WizardContext, mode?: WizardMode): Promise<
     // (Connectors, Orbit, Language, Appearance, Desktop, Notifications, Integrations)
     ctx.prompter.info('Additional settings (Connectors, Orbit, Language, Appearance, Notifications) are available in Settings →');
   } else {
-    // Quick mode: auto-detect available port and save
+    // Quick mode: respect existing saved port, then fall back to port scan
+    const { readAppConfig, writeAppConfig } = await import('../app-config.js');
+    const existingConfig = await readAppConfig(ctx.dataDir);
+    const preferred = typeof existingConfig.port === 'number' ? existingConfig.port : 7456;
     ctx.resolvedPort = await ctx.prompter.spinner('Scanning for available port...', () =>
-      findAvailablePort(),
+      findAvailablePort(preferred),
     );
-    if (ctx.resolvedPort !== 7456) {
-      ctx.prompter.info(`Port 7456 is in use — using port ${ctx.resolvedPort}.`);
+    if (ctx.resolvedPort !== preferred) {
+      ctx.prompter.info(`Port ${preferred} is in use — using port ${ctx.resolvedPort}.`);
     }
-    const { writeAppConfig } = await import('../app-config.js');
     await writeAppConfig(ctx.dataDir, { port: ctx.resolvedPort });
   }
 

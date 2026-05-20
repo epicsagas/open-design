@@ -30,9 +30,17 @@ async function startAndOpen(ctx: WizardContext): Promise<void> {
   try {
     const { startServer } = await import('../../server.js');
     const { openBrowser } = await import('../../browser-open.js');
+    const { readAppConfig } = await import('../../app-config.js');
 
-    const port = ctx.resolvedPort ?? (typeof ctx.flags['port'] === 'string' ? parseInt(ctx.flags['port'], 10) : 7456);
-    const host = typeof ctx.flags['bind'] === 'string' ? ctx.flags['bind'] : '127.0.0.1';
+    const savedConfig = await readAppConfig(ctx.dataDir);
+    const port = ctx.resolvedPort
+      ?? (typeof ctx.flags['port'] === 'string' ? parseInt(ctx.flags['port'], 10) : undefined)
+      ?? savedConfig.port
+      ?? 7456;
+    ctx.resolvedPort = port;
+    const host = typeof ctx.flags['bind'] === 'string'
+      ? ctx.flags['bind']
+      : (savedConfig.bindHost ?? '127.0.0.1');
 
     const url = await startServer({ port, host, returnServer: false }) as unknown as string;
 

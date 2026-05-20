@@ -2,12 +2,16 @@ import type { WizardContext } from '../wizard.js';
 import { findAvailablePort } from '../port-scan.js';
 
 export async function runNetwork(ctx: WizardContext): Promise<number> {
+  const { readAppConfig } = await import('../../app-config.js');
+  const existingConfig = await readAppConfig(ctx.dataDir);
+  const preferred = typeof existingConfig.port === 'number' ? existingConfig.port : 7456;
+
   const defaultPort = await ctx.prompter.spinner('Scanning for available port...', () =>
-    findAvailablePort(),
+    findAvailablePort(preferred),
   );
 
-  if (defaultPort !== 7456) {
-    ctx.prompter.info(`Port 7456 is in use — found available port ${defaultPort}.`);
+  if (defaultPort !== preferred) {
+    ctx.prompter.info(`Port ${preferred} is in use — found available port ${defaultPort}.`);
   }
 
   const host = await ctx.prompter.select<string>('Bind host:', [
